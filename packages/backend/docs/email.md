@@ -71,7 +71,7 @@ sequenceDiagram
 
 通過後の処理:
 
-1. 6桁コードを生成し SHA-256 ハッシュを保存（平文は保存しない）
+1. 6桁コードを生成し bcrypt でハッシュして保存（平文は保存しない）
 2. 同 `email` + `purpose` の未使用トークンを無効化
 3. 有効期限 **10分** のトークンを作成
 4. メール送信（未実装）
@@ -94,8 +94,9 @@ sequenceDiagram
   C->>Ctrl: POST /email/verify/:purpose
   Ctrl->>Ctrl: purpose / email / code を検証
   Ctrl->>Svc: verifyCode
-  Svc->>Repo: 有効トークンを照合
-  alt 不一致 or 期限切れ or email不一致
+  Svc->>Repo: email+purpose の有効トークン取得
+  Svc->>Svc: bcrypt でコード照合
+  alt 不一致 or 期限切れ
     Svc-->>Ctrl: error
     Ctrl-->>C: 400 invalid_verification_code
   else 一致
@@ -108,8 +109,8 @@ sequenceDiagram
 
 **検証処理（実装済み）**
 
-1. コードをハッシュ化し、`purpose` + ハッシュで有効トークンを検索
-2. トークンの `email` がリクエストと一致すること
+1. `email` + `purpose` の直近トークンを取得（未使用・期限内）
+2. 平文コードを bcrypt で照合（ソルト付きのためハッシュ値検索はしない）
 3. 一致したら使用済みにする
 
 **purpose ごとの副作用（未実装 → 501）**
@@ -136,5 +137,7 @@ sequenceDiagram
 ## 補足
 
 - コード生成: `shared/createRandomCode`
-- ハッシュ: `shared/hashVerificationCode`（SHA-256）
+- ハッシュ / 照合: `shared/hashSecret` / `shared/verifySecret`（bcrypt）
+  - 一方向ハッシュのため復号は不可。照合のみ行う
+  - 認証コード・パスワード・アクセストークン等で共通利用する想定
 - `email-change` の「ログイン必須」は今後ミドルウェアで担保する

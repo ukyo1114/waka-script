@@ -10,7 +10,7 @@ import {
   TokenSendNotAllowedError,
   UserNotLockedError,
 } from "../../shared/errors.js";
-import { hashVerificationCode } from "../../shared/hash.js";
+import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { createRandomCode } from "../../shared/random-code.js";
 import {
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
@@ -53,7 +53,7 @@ export class EmailService {
     await this.assertTokenSendable(email, purpose, now);
 
     const code = createRandomCode();
-    const tokenHash = hashVerificationCode(code);
+    const tokenHash = await hashSecret(code);
     const expiresAt = new Date(
       now.getTime() + EMAIL_CODE_TTL_MINUTES * 60_000,
     );
@@ -74,16 +74,22 @@ export class EmailService {
   async verifyCode(input: VerifyCodeInput): Promise<void> {
     const email = normalizeEmail(input.email);
     const purpose = input.purpose;
-    const tokenHash = hashVerificationCode(input.code);
     const now = new Date();
 
-    const token = await this.deps.emailTokens.findValidByTokenHash(
+    // bcrypt はソルト付きのためハッシュ値での検索はできない。
+    // email+purpose の有効トークンを取り、平文コードと照合する。
+    const token = await this.deps.emailTokens.findLatestByEmailAndPurpose(
+      email,
       purpose,
-      tokenHash,
-      now,
     );
 
-    if (!token || token.email !== email) {
+    const isValid =
+      token !== null &&
+      token.usedAt === null &&
+      token.expiresAt > now &&
+      (await verifySecret(input.code, token.tokenHash));
+
+    if (!isValid || !token) {
       throw new InvalidVerificationCodeError();
     }
 

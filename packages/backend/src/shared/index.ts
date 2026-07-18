@@ -1,5 +1,5 @@
 export { createRandomCode } from "./random-code.js";
-export { hashVerificationCode } from "./hash.js";
+export { hashSecret, verifySecret, BCRYPT_COST } from "./hash.js";
 export {
   AppError,
   EmailAlreadyRegisteredError,
