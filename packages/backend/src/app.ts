@@ -1,5 +1,6 @@
 import express from "express";
-import { authRouter } from "./routes/auth.js";
+import { emailRouter } from "./routes/email.js";
+import { userRouter } from "./routes/user.js";
 
 export function createApp() {
   const app = express();
@@ -10,7 +11,8 @@ export function createApp() {
     res.json({ ok: true });
   });
 
-  app.use("/auth", authRouter);
+  app.use("/user", userRouter);
+  app.use("/email", emailRouter);
 
   return app;
 }
