@@ -6,21 +6,10 @@ export type Repositories = {
   emailTokens: EmailTokenRepository;
 };
 
-export type {
-  CreateUserInput,
-  User,
-  UserId,
-  UserRepository,
-} from "./user/index.js";
+export type { UserRepository } from "./user/index.js";
 export { UserRepositoryImpl } from "./user/index.js";
 
-export type {
-  CreateEmailTokenInput,
-  EmailToken,
-  EmailTokenId,
-  EmailTokenPurpose,
-  EmailTokenRepository,
-} from "./email-token/index.js";
+export type { EmailTokenRepository } from "./email-token/index.js";
 export { EmailTokenRepositoryImpl } from "./email-token/index.js";
 
 export { getRepositories } from "./get-repositories.js";

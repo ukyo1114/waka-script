@@ -1,10 +1,10 @@
-import type { UserId } from "../user/types.js";
 import type {
   CreateEmailTokenInput,
+  EmailPurpose,
   EmailToken,
-  EmailTokenPurpose,
-  EmailTokenRepository,
-} from "./types.js";
+} from "../../domain/email/index.js";
+import type { UserId } from "../../domain/user/id.js";
+import type { EmailTokenRepository } from "./types.js";
 
 function notImplemented(): never {
   throw new Error("EmailTokenRepository is not implemented yet");
@@ -17,7 +17,7 @@ export class EmailTokenRepositoryImpl implements EmailTokenRepository {
   }
 
   findValidByTokenHash(
-    _purpose: EmailTokenPurpose,
+    _purpose: EmailPurpose,
     _tokenHash: string,
     _now?: Date,
   ): Promise<EmailToken | null> {
@@ -30,7 +30,7 @@ export class EmailTokenRepositoryImpl implements EmailTokenRepository {
 
   invalidateActiveForUser(
     _userId: UserId,
-    _purpose: EmailTokenPurpose,
+    _purpose: EmailPurpose,
   ): Promise<number> {
     return notImplemented();
   }

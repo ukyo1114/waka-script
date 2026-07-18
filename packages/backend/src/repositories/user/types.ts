@@ -1,20 +1,4 @@
-export type UserId = string;
-
-export type User = {
-  id: UserId;
-  email: string;
-  passwordHash: string;
-  displayName: string;
-  emailVerifiedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type CreateUserInput = {
-  email: string;
-  passwordHash: string;
-  displayName: string;
-};
+import type { CreateUserInput, User, UserId } from "../../domain/user/index.js";
 
 export interface UserRepository {
   create(input: CreateUserInput): Promise<User>;
