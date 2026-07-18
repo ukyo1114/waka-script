@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { isEmailPurpose } from "../../domain/email/index.js";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { EmailService } from "../../services/email/index.js";
+import { NotImplementedError } from "../../shared/errors.js";
 import {
   badRequest,
   handleControllerError,
@@ -25,7 +26,7 @@ function createEmailService(req: Request): EmailService {
   try {
     return new EmailService(getRepositories(req));
   } catch {
-    return new EmailService();
+    throw new NotImplementedError("email.repositories");
   }
 }
 

@@ -6,6 +6,7 @@ export type User = {
   passwordHash: string;
   displayName: string;
   emailVerifiedAt: Date | null;
+  lockedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

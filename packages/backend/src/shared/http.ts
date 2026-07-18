@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { NotImplementedError } from "./errors.js";
+import { AppError, NotImplementedError } from "./errors.js";
 
 export type JsonBody = Record<string, unknown>;
 
@@ -17,6 +17,13 @@ export function handleControllerError(res: Response, error: unknown) {
     return res.status(501).json({
       error: error.code,
       operation: error.operation,
+      message: error.message,
+    });
+  }
+
+  if (error instanceof AppError) {
+    return res.status(error.statusCode).json({
+      error: error.code,
       message: error.message,
     });
   }

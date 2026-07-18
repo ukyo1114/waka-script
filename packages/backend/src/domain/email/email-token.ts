@@ -5,7 +5,8 @@ export type EmailTokenId = string;
 
 export type EmailToken = {
   id: EmailTokenId;
-  userId: UserId;
+  email: string;
+  userId: UserId | null;
   purpose: EmailPurpose;
   tokenHash: string;
   expiresAt: Date;
@@ -14,7 +15,8 @@ export type EmailToken = {
 };
 
 export type CreateEmailTokenInput = {
-  userId: UserId;
+  email: string;
+  userId: UserId | null;
   purpose: EmailPurpose;
   tokenHash: string;
   expiresAt: Date;

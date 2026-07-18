@@ -3,7 +3,6 @@ import type {
   EmailPurpose,
   EmailToken,
 } from "../../domain/email/index.js";
-import type { UserId } from "../../domain/user/id.js";
 import type { EmailTokenRepository } from "./types.js";
 
 function notImplemented(): never {
@@ -24,12 +23,19 @@ export class EmailTokenRepositoryImpl implements EmailTokenRepository {
     return notImplemented();
   }
 
+  findLatestByEmailAndPurpose(
+    _email: string,
+    _purpose: EmailPurpose,
+  ): Promise<EmailToken | null> {
+    return notImplemented();
+  }
+
   markUsed(_id: string, _usedAt?: Date): Promise<EmailToken | null> {
     return notImplemented();
   }
 
-  invalidateActiveForUser(
-    _userId: UserId,
+  invalidateActiveForEmail(
+    _email: string,
     _purpose: EmailPurpose,
   ): Promise<number> {
     return notImplemented();
