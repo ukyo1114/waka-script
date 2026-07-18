@@ -7,6 +7,9 @@ export const EMAIL_PURPOSES = [
 
 export type EmailPurpose = (typeof EMAIL_PURPOSES)[number];
 
-export function isEmailPurpose(value: string): value is EmailPurpose {
-  return (EMAIL_PURPOSES as readonly string[]).includes(value);
-}
+export type IsEmailPurpose = (value: string) => value is EmailPurpose;
+
+export const isEmailPurpose: IsEmailPurpose = (
+  value,
+): value is EmailPurpose =>
+  (EMAIL_PURPOSES as readonly string[]).includes(value);
