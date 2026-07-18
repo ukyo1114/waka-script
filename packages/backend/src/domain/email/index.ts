@@ -5,14 +5,14 @@ export type {
   EmailToken,
   EmailTokenId,
   IsEmailPurpose,
-} from "./types.js";
+} from "./email.types.js";
 export {
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
   EMAIL_CODE_TTL_MINUTES,
   EMAIL_PURPOSES,
-} from "./types.js";
+} from "./email.types.js";
 export {
   assertEmailEligibility,
   assertTokenSendable,
   isEmailPurpose,
-} from "./domain.js";
+} from "./email.domain.js";

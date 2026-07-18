@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { User } from "../user/index.js";
+import type { User } from "../user/user.types.js";
 import {
   assertEmailEligibility,
   assertTokenSendable,
   isEmailPurpose,
-} from "./domain.js";
-import { EMAIL_CODE_RESEND_COOLDOWN_SECONDS } from "./types.js";
+} from "./email.domain.js";
+import { EMAIL_CODE_RESEND_COOLDOWN_SECONDS } from "./email.types.js";
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,

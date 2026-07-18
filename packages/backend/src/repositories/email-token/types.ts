@@ -1,5 +1,5 @@
 import type { EmailPurpose, EmailToken } from "../../domain/email/index.js";
-import type { UserId } from "../../domain/user/id.js";
+import type { UserId } from "../../domain/user/index.js";
 
 export type CreateEmailTokenInput = {
   email: string;

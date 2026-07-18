@@ -1,5 +1,4 @@
-import type { UserId } from "../user/id.js";
-import type { User } from "../user/index.js";
+import type { User, UserId } from "../user/user.types.js";
 
 export const EMAIL_PURPOSES = [
   "register",

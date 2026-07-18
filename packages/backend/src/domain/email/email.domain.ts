@@ -11,7 +11,7 @@ import {
   type AssertTokenSendable,
   type EmailPurpose,
   type IsEmailPurpose,
-} from "./types.js";
+} from "./email.types.js";
 
 export const isEmailPurpose: IsEmailPurpose = (
   value,

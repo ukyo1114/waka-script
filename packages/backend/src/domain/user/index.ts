@@ -1,2 +1,1 @@
-export type { UserId } from "./id.js";
-export type { User } from "./user.js";
+export type { User, UserId } from "./user.types.js";

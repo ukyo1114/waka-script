@@ -1,4 +1,4 @@
-import type { UserId } from "./id.js";
+export type UserId = string;
 
 export type User = {
   id: UserId;
