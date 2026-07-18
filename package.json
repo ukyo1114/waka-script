@@ -1,7 +1,9 @@
 {
   "name": "jinro",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build -w @jinro/backend",
     "dev": "npm run dev -w @jinro/backend",
@@ -10,5 +12,9 @@
   },
   "devDependencies": {
     "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "bcrypt@6.0.0": true
   }
 }
