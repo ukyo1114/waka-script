@@ -1,21 +1,17 @@
-import type { EmailPurpose } from "../../domain/email/index.js";
-import type { User } from "../../domain/user/index.js";
+import {
+  assertEmailEligibility,
+  assertTokenSendable,
+  EMAIL_CODE_TTL_MINUTES,
+  type EmailPurpose,
+} from "../../domain/email/index.js";
 import type { EmailTokenRepository } from "../../repositories/email-token/types.js";
 import type { UserRepository } from "../../repositories/user/types.js";
 import {
-  EmailAlreadyRegisteredError,
-  EmailNotRegisteredError,
   InvalidVerificationCodeError,
   NotImplementedError,
-  TokenSendNotAllowedError,
-  UserNotLockedError,
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { createRandomCode } from "../../shared/random-code.js";
-import {
-  EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
-  EMAIL_CODE_TTL_MINUTES,
-} from "./constants.js";
 
 export type SendVerificationCodeInput = {
   purpose: EmailPurpose;
@@ -49,8 +45,14 @@ export class EmailService {
     const purpose = input.purpose;
     const now = new Date();
 
-    const user = await this.assertEmailEligibility(purpose, email);
-    await this.assertTokenSendable(email, purpose, now);
+    const foundUser = await this.deps.users.findByEmail(email);
+    const user = assertEmailEligibility(purpose, email, foundUser);
+
+    const latest = await this.deps.emailTokens.findLatestByEmailAndPurpose(
+      email,
+      purpose,
+    );
+    assertTokenSendable(latest?.createdAt, now);
 
     const code = createRandomCode();
     const tokenHash = await hashSecret(code);
@@ -97,60 +99,5 @@ export class EmailService {
 
     // TODO: purpose ごとの副作用
     throw new NotImplementedError(`email.verify.side_effect.${purpose}`);
-  }
-
-  /**
-   * purpose に応じて「未登録必須」または「登録済み必須」などを判定する。
-   */
-  private async assertEmailEligibility(
-    purpose: EmailPurpose,
-    email: string,
-  ): Promise<User | null> {
-    const user = await this.deps.users.findByEmail(email);
-
-    switch (purpose) {
-      case "register":
-      case "email-change":
-        if (user) throw new EmailAlreadyRegisteredError(email);
-        return null;
-
-      case "password-reset":
-        if (!user) throw new EmailNotRegisteredError(email);
-        return user;
-
-      case "unlock":
-        if (!user) throw new EmailNotRegisteredError(email);
-        if (!user.lockedAt) throw new UserNotLockedError(email);
-        return user;
-
-      default: {
-        const _exhaustive: never = purpose;
-        return _exhaustive;
-      }
-    }
-  }
-
-  /**
-   * 同一 email+purpose で、クールダウン中なら送信不可。
-   */
-  private async assertTokenSendable(
-    email: string,
-    purpose: EmailPurpose,
-    now: Date,
-  ): Promise<void> {
-    const latest = await this.deps.emailTokens.findLatestByEmailAndPurpose(
-      email,
-      purpose,
-    );
-    if (!latest) return;
-
-    const elapsedMs = now.getTime() - latest.createdAt.getTime();
-    const cooldownMs = EMAIL_CODE_RESEND_COOLDOWN_SECONDS * 1000;
-    if (elapsedMs < cooldownMs) {
-      const retryAfterSec = Math.ceil((cooldownMs - elapsedMs) / 1000);
-      throw new TokenSendNotAllowedError(
-        `resend cooldown active; retry after ${retryAfterSec}s`,
-      );
-    }
   }
 }
