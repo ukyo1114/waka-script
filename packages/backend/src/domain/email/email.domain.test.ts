@@ -21,7 +21,6 @@ const createUser = (overrides: Partial<User> = {}): User => {
   return {
     id: "user-1",
     email: "user@example.com",
-    passwordHash: "hash",
     displayName: "User",
     emailVerifiedAt: null,
     lockedAt: null,

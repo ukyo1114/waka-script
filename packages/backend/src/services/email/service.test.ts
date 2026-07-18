@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { EmailCode, EmailPurpose } from "../../domain/email/index.js";
-import type { User } from "../../domain/user/index.js";
+import type { EmailPurpose } from "../../domain/email/index.js";
 import type {
   CreateEmailCodeInput,
+  EmailCode,
   EmailCodeRepository,
 } from "../../repositories/email-code/index.js";
-import type { UserRepository } from "../../repositories/user/index.js";
+import type {
+  UserRecord,
+  UserRepository,
+} from "../../repositories/user/index.js";
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
@@ -15,7 +18,7 @@ import {
 } from "../../shared/errors.js";
 import { EmailService } from "./service.js";
 
-function createUser(overrides: Partial<User> = {}): User {
+function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();
   return {
     id: "user-1",
@@ -47,21 +50,21 @@ function createEmailCode(overrides: Partial<EmailCode> = {}): EmailCode {
 }
 
 class FakeUserRepository implements UserRepository {
-  constructor(private user: User | null = null) {}
+  constructor(private user: UserRecord | null = null) {}
 
-  async create(): Promise<User> {
+  async create(): Promise<UserRecord> {
     throw new Error("unused");
   }
-  async findById(): Promise<User | null> {
+  async findById(): Promise<UserRecord | null> {
     return this.user;
   }
-  async findByEmail(): Promise<User | null> {
+  async findByEmail(): Promise<UserRecord | null> {
     return this.user;
   }
-  async markEmailVerified(): Promise<User | null> {
+  async markEmailVerified(): Promise<UserRecord | null> {
     return this.user;
   }
-  async updatePasswordHash(): Promise<User | null> {
+  async updatePasswordHash(): Promise<UserRecord | null> {
     return this.user;
   }
 }
@@ -118,7 +121,7 @@ class FakeEmailCodeRepository implements EmailCodeRepository {
 }
 
 function service(
-  user: User | null,
+  user: UserRecord | null,
   latest: EmailCode | null = null,
 ): { emailService: EmailService; codes: FakeEmailCodeRepository } {
   const codes = new FakeEmailCodeRepository(latest);

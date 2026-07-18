@@ -1,4 +1,4 @@
-import type { User, UserId } from "../user/index.js";
+import type { User } from "../user/index.js";
 
 export const EMAIL_PURPOSES = [
   "register",
@@ -10,21 +10,6 @@ export const EMAIL_PURPOSES = [
 export type EmailPurpose = (typeof EMAIL_PURPOSES)[number];
 
 export type IsEmailPurpose = (value: string) => value is EmailPurpose;
-
-export type EmailCodeId = string;
-
-/** メール認証コード（JWT などのセッショントークンとは別） */
-export type EmailCode = {
-  id: EmailCodeId;
-  email: string;
-  userId: UserId | null;
-  purpose: EmailPurpose;
-  codeHash: string;
-  expiresAt: Date;
-  usedAt: Date | null;
-  attemptCount: number;
-  createdAt: Date;
-};
 
 export type AssertEmailEligibility = (
   purpose: EmailPurpose,

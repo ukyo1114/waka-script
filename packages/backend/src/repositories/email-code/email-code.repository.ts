@@ -1,6 +1,7 @@
-import type { EmailCode, EmailPurpose } from "../../domain/email/index.js";
+import type { EmailPurpose } from "../../domain/email/index.js";
 import type {
   CreateEmailCodeInput,
+  EmailCode,
   EmailCodeRepository,
 } from "./email-code.repository.types.js";
 

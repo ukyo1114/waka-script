@@ -2,8 +2,6 @@ export type {
   AssertEmailCodeSendable,
   AssertEmailEligibility,
   AssertVerificationAttemptAllowed,
-  EmailCode,
-  EmailCodeId,
   EmailPurpose,
   IsEmailPurpose,
 } from "./email.types.js";

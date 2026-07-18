@@ -6,11 +6,17 @@ export type Repositories = {
   emailCodes: EmailCodeRepository;
 };
 
-export type { CreateUserInput, UserRepository } from "./user/index.js";
+export type {
+  CreateUserInput,
+  UserRecord,
+  UserRepository,
+} from "./user/index.js";
 export { UserRepositoryImpl } from "./user/index.js";
 
 export type {
   CreateEmailCodeInput,
+  EmailCode,
+  EmailCodeId,
   EmailCodeRepository,
 } from "./email-code/index.js";
 export { EmailCodeRepositoryImpl } from "./email-code/index.js";

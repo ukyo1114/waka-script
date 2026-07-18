@@ -11,7 +11,7 @@
 | `password-reset` | パスワードリセット |
 | `unlock` | ユーザーロック解除 |
 
-認証コードの永続化は `EmailCodeRepository`（`repositories/email-code`）が担当する。  
+認証コードの永続化レコード型 `EmailCode` とリポジトリは `repositories/email-code` が担当する。  
 JWT などのセッショントークンとは別物。
 
 ---
