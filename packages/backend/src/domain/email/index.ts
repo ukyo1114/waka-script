@@ -3,8 +3,4 @@ export {
   isEmailPurpose,
   type EmailPurpose,
 } from "./purpose.js";
-export type {
-  CreateEmailTokenInput,
-  EmailToken,
-  EmailTokenId,
-} from "./email-token.js";
+export type { EmailToken, EmailTokenId } from "./email-token.js";

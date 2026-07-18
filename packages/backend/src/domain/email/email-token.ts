@@ -13,11 +13,3 @@ export type EmailToken = {
   usedAt: Date | null;
   createdAt: Date;
 };
-
-export type CreateEmailTokenInput = {
-  email: string;
-  userId: UserId | null;
-  purpose: EmailPurpose;
-  tokenHash: string;
-  expiresAt: Date;
-};

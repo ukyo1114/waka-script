@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type {
-  CreateEmailTokenInput,
   EmailPurpose,
   EmailToken,
 } from "../../domain/email/index.js";
 import type { User } from "../../domain/user/index.js";
-import type { EmailTokenRepository } from "../../repositories/email-token/types.js";
+import type {
+  CreateEmailTokenInput,
+  EmailTokenRepository,
+} from "../../repositories/email-token/types.js";
 import type { UserRepository } from "../../repositories/user/types.js";
 import {
   EmailAlreadyRegisteredError,

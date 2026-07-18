@@ -1,9 +1,5 @@
-import type {
-  CreateEmailTokenInput,
-  EmailPurpose,
-  EmailToken,
-} from "../../domain/email/index.js";
-import type { EmailTokenRepository } from "./types.js";
+import type { EmailPurpose, EmailToken } from "../../domain/email/index.js";
+import type { CreateEmailTokenInput, EmailTokenRepository } from "./types.js";
 
 function notImplemented(): never {
   throw new Error("EmailTokenRepository is not implemented yet");
