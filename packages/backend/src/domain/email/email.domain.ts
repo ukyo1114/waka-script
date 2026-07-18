@@ -9,8 +9,8 @@ import {
   EMAIL_CODE_MAX_ATTEMPTS,
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
   EMAIL_PURPOSES,
+  type AssertEmailCodeSendable,
   type AssertEmailEligibility,
-  type AssertTokenSendable,
   type AssertVerificationAttemptAllowed,
   type EmailPurpose,
   type IsEmailPurpose,
@@ -53,14 +53,14 @@ export const assertEmailEligibility: AssertEmailEligibility = (
 };
 
 /**
- * 直近トークンの作成時刻から、再送クールダウンを判定する。
+ * 直近認証コードの作成時刻から、再送クールダウンを判定する。
  * レコード取得は呼び出し側（サービス）で行う。
  *
  * - latestCreatedAt が無い → 送信可
  * - クールダウン経過済み → 送信可
  * - クールダウン中 → TokenSendNotAllowedError
  */
-export const assertTokenSendable: AssertTokenSendable = (
+export const assertEmailCodeSendable: AssertEmailCodeSendable = (
   latestCreatedAt,
   now,
   cooldownSeconds = EMAIL_CODE_RESEND_COOLDOWN_SECONDS,

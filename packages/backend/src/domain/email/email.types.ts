@@ -11,14 +11,15 @@ export type EmailPurpose = (typeof EMAIL_PURPOSES)[number];
 
 export type IsEmailPurpose = (value: string) => value is EmailPurpose;
 
-export type EmailTokenId = string;
+export type EmailCodeId = string;
 
-export type EmailToken = {
-  id: EmailTokenId;
+/** メール認証コード（JWT などのセッショントークンとは別） */
+export type EmailCode = {
+  id: EmailCodeId;
   email: string;
   userId: UserId | null;
   purpose: EmailPurpose;
-  tokenHash: string;
+  codeHash: string;
   expiresAt: Date;
   usedAt: Date | null;
   attemptCount: number;
@@ -31,7 +32,7 @@ export type AssertEmailEligibility = (
   user: User | null,
 ) => User | null;
 
-export type AssertTokenSendable = (
+export type AssertEmailCodeSendable = (
   latestCreatedAt: Date | null | undefined,
   now: Date,
   cooldownSeconds?: number,

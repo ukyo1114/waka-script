@@ -1,11 +1,11 @@
 import {
+  assertEmailCodeSendable,
   assertEmailEligibility,
-  assertTokenSendable,
   assertVerificationAttemptAllowed,
   EMAIL_CODE_TTL_MINUTES,
   type EmailPurpose,
 } from "../../domain/email/index.js";
-import type { EmailTokenRepository } from "../../repositories/email-token/types.js";
+import type { EmailCodeRepository } from "../../repositories/email-code/types.js";
 import type { UserRepository } from "../../repositories/user/types.js";
 import {
   InvalidVerificationCodeError,
@@ -27,7 +27,7 @@ export type VerifyCodeInput = {
 
 export type EmailServiceDeps = {
   users: UserRepository;
-  emailTokens: EmailTokenRepository;
+  emailCodes: EmailCodeRepository;
 };
 
 function normalizeEmail(email: string): string {
@@ -49,24 +49,24 @@ export class EmailService {
     const foundUser = await this.deps.users.findByEmail(email);
     const user = assertEmailEligibility(purpose, email, foundUser);
 
-    const latest = await this.deps.emailTokens.findLatestByEmailAndPurpose(
+    const latest = await this.deps.emailCodes.findLatestByEmailAndPurpose(
       email,
       purpose,
     );
-    assertTokenSendable(latest?.createdAt, now);
+    assertEmailCodeSendable(latest?.createdAt, now);
 
     const code = createRandomCode();
-    const tokenHash = await hashSecret(code);
+    const codeHash = await hashSecret(code);
     const expiresAt = new Date(
       now.getTime() + EMAIL_CODE_TTL_MINUTES * 60_000,
     );
 
-    await this.deps.emailTokens.invalidateActiveForEmail(email, purpose);
-    await this.deps.emailTokens.create({
+    await this.deps.emailCodes.invalidateActiveForEmail(email, purpose);
+    await this.deps.emailCodes.create({
       email,
       userId: user?.id ?? null,
       purpose,
-      tokenHash,
+      codeHash,
       expiresAt,
     });
 
@@ -80,25 +80,29 @@ export class EmailService {
     const now = new Date();
 
     // bcrypt はソルト付きのためハッシュ値での検索はできない。
-    // email+purpose の有効トークンを取り、平文コードと照合する。
-    const token = await this.deps.emailTokens.findLatestByEmailAndPurpose(
+    // email+purpose の有効な認証コードを取り、平文と照合する。
+    const emailCode = await this.deps.emailCodes.findLatestByEmailAndPurpose(
       email,
       purpose,
     );
 
-    if (!token || token.usedAt !== null || token.expiresAt <= now) {
+    if (
+      !emailCode ||
+      emailCode.usedAt !== null ||
+      emailCode.expiresAt <= now
+    ) {
       throw new InvalidVerificationCodeError();
     }
 
-    assertVerificationAttemptAllowed(token.attemptCount);
+    assertVerificationAttemptAllowed(emailCode.attemptCount);
 
-    const matched = await verifySecret(input.code, token.tokenHash);
+    const matched = await verifySecret(input.code, emailCode.codeHash);
     if (!matched) {
-      await this.deps.emailTokens.incrementAttemptCount(token.id);
+      await this.deps.emailCodes.incrementAttemptCount(emailCode.id);
       throw new InvalidVerificationCodeError();
     }
 
-    await this.deps.emailTokens.markUsed(token.id, now);
+    await this.deps.emailCodes.markUsed(emailCode.id, now);
 
     // TODO: purpose ごとの副作用
     throw new NotImplementedError(`email.verify.side_effect.${purpose}`);

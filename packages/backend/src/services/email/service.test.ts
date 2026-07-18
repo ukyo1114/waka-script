@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type {
-  EmailPurpose,
-  EmailToken,
-} from "../../domain/email/index.js";
+import type { EmailCode, EmailPurpose } from "../../domain/email/index.js";
 import type { User } from "../../domain/user/index.js";
 import type {
-  CreateEmailTokenInput,
-  EmailTokenRepository,
-} from "../../repositories/email-token/types.js";
+  CreateEmailCodeInput,
+  EmailCodeRepository,
+} from "../../repositories/email-code/types.js";
 import type { UserRepository } from "../../repositories/user/types.js";
 import {
   EmailAlreadyRegisteredError,
@@ -33,14 +30,14 @@ function createUser(overrides: Partial<User> = {}): User {
   };
 }
 
-function createToken(overrides: Partial<EmailToken> = {}): EmailToken {
+function createEmailCode(overrides: Partial<EmailCode> = {}): EmailCode {
   const now = new Date();
   return {
-    id: "token-1",
+    id: "code-1",
     email: "user@example.com",
     userId: "user-1",
     purpose: "register",
-    tokenHash: "hash",
+    codeHash: "hash",
     expiresAt: new Date(now.getTime() + 600_000),
     usedAt: null,
     attemptCount: 0,
@@ -69,42 +66,42 @@ class FakeUserRepository implements UserRepository {
   }
 }
 
-class FakeEmailTokenRepository implements EmailTokenRepository {
-  created: CreateEmailTokenInput[] = [];
+class FakeEmailCodeRepository implements EmailCodeRepository {
+  created: CreateEmailCodeInput[] = [];
   invalidated = 0;
   attemptIncrements = 0;
 
-  constructor(private latest: EmailToken | null = null) {}
+  constructor(private latest: EmailCode | null = null) {}
 
-  get latestToken(): EmailToken | null {
+  get latestCode(): EmailCode | null {
     return this.latest;
   }
 
-  async create(input: CreateEmailTokenInput): Promise<EmailToken> {
+  async create(input: CreateEmailCodeInput): Promise<EmailCode> {
     this.created.push(input);
-    return createToken({
+    return createEmailCode({
       email: input.email,
       userId: input.userId,
       purpose: input.purpose,
-      tokenHash: input.tokenHash,
+      codeHash: input.codeHash,
       expiresAt: input.expiresAt,
       attemptCount: 0,
     });
   }
 
-  async findValidByTokenHash(): Promise<EmailToken | null> {
+  async findValidByCodeHash(): Promise<EmailCode | null> {
     return null;
   }
 
-  async findLatestByEmailAndPurpose(): Promise<EmailToken | null> {
+  async findLatestByEmailAndPurpose(): Promise<EmailCode | null> {
     return this.latest;
   }
 
-  async markUsed(): Promise<EmailToken | null> {
+  async markUsed(): Promise<EmailCode | null> {
     return null;
   }
 
-  async incrementAttemptCount(id: string): Promise<EmailToken | null> {
+  async incrementAttemptCount(id: string): Promise<EmailCode | null> {
     this.attemptIncrements += 1;
     if (!this.latest || this.latest.id !== id) return null;
     this.latest = {
@@ -122,27 +119,27 @@ class FakeEmailTokenRepository implements EmailTokenRepository {
 
 function service(
   user: User | null,
-  latest: EmailToken | null = null,
-): { emailService: EmailService; tokens: FakeEmailTokenRepository } {
-  const tokens = new FakeEmailTokenRepository(latest);
+  latest: EmailCode | null = null,
+): { emailService: EmailService; codes: FakeEmailCodeRepository } {
+  const codes = new FakeEmailCodeRepository(latest);
   const emailService = new EmailService({
     users: new FakeUserRepository(user),
-    emailTokens: tokens,
+    emailCodes: codes,
   });
-  return { emailService, tokens };
+  return { emailService, codes };
 }
 
 describe("EmailService.sendVerificationCode", () => {
   it("register: 未登録メールなら送信できる", async () => {
-    const { emailService, tokens } = service(null);
+    const { emailService, codes } = service(null);
     await emailService.sendVerificationCode({
       purpose: "register",
       email: "new@example.com",
     });
-    assert.equal(tokens.created.length, 1);
-    assert.equal(tokens.created[0]?.email, "new@example.com");
-    assert.equal(tokens.created[0]?.userId, null);
-    assert.equal(tokens.invalidated, 1);
+    assert.equal(codes.created.length, 1);
+    assert.equal(codes.created[0]?.email, "new@example.com");
+    assert.equal(codes.created[0]?.userId, null);
+    assert.equal(codes.invalidated, 1);
   });
 
   it("register: 登録済みメールなら拒否する", async () => {
@@ -183,12 +180,12 @@ describe("EmailService.sendVerificationCode", () => {
 
   it("password-reset: 登録済みメールなら送信できる", async () => {
     const user = createUser({ email: "user@example.com" });
-    const { emailService, tokens } = service(user);
+    const { emailService, codes } = service(user);
     await emailService.sendVerificationCode({
       purpose: "password-reset",
       email: "user@example.com",
     });
-    assert.equal(tokens.created[0]?.userId, user.id);
+    assert.equal(codes.created[0]?.userId, user.id);
   });
 
   it("unlock: ロックされていないユーザーは拒否する", async () => {
@@ -205,16 +202,16 @@ describe("EmailService.sendVerificationCode", () => {
 
   it("unlock: ロック中ユーザーなら送信できる", async () => {
     const user = createUser({ lockedAt: new Date() });
-    const { emailService, tokens } = service(user);
+    const { emailService, codes } = service(user);
     await emailService.sendVerificationCode({
       purpose: "unlock",
       email: "user@example.com",
     });
-    assert.equal(tokens.created.length, 1);
+    assert.equal(codes.created.length, 1);
   });
 
   it("クールダウン中は再送を拒否する", async () => {
-    const latest = createToken({
+    const latest = createEmailCode({
       purpose: "register" as EmailPurpose,
       createdAt: new Date(),
     });
@@ -230,27 +227,27 @@ describe("EmailService.sendVerificationCode", () => {
   });
 
   it("クールダウン経過後は再送できる", async () => {
-    const latest = createToken({
+    const latest = createEmailCode({
       purpose: "register",
       createdAt: new Date(Date.now() - 61_000),
     });
-    const { emailService, tokens } = service(null, latest);
+    const { emailService, codes } = service(null, latest);
     await emailService.sendVerificationCode({
       purpose: "register",
       email: "new@example.com",
     });
-    assert.equal(tokens.created.length, 1);
+    assert.equal(codes.created.length, 1);
   });
 });
 
 describe("EmailService.verifyCode", () => {
   it("試行回数が上限に達していると拒否する", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
-    const tokenHash = await hashSecret("123456");
-    const latest = createToken({
+    const codeHash = await hashSecret("123456");
+    const latest = createEmailCode({
       email: "new@example.com",
       purpose: "register",
-      tokenHash,
+      codeHash,
       attemptCount: 5,
     });
     const { emailService } = service(null, latest);
@@ -270,14 +267,14 @@ describe("EmailService.verifyCode", () => {
 
   it("コード不一致なら試行回数を増やして拒否する", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
-    const tokenHash = await hashSecret("123456");
-    const latest = createToken({
+    const codeHash = await hashSecret("123456");
+    const latest = createEmailCode({
       email: "new@example.com",
       purpose: "register",
-      tokenHash,
+      codeHash,
       attemptCount: 0,
     });
-    const { emailService, tokens } = service(null, latest);
+    const { emailService, codes } = service(null, latest);
     const { InvalidVerificationCodeError } = await import(
       "../../shared/errors.js"
     );
@@ -290,7 +287,7 @@ describe("EmailService.verifyCode", () => {
         }),
       InvalidVerificationCodeError,
     );
-    assert.equal(tokens.attemptIncrements, 1);
-    assert.equal(tokens.latestToken?.attemptCount, 1);
+    assert.equal(codes.attemptIncrements, 1);
+    assert.equal(codes.latestCode?.attemptCount, 1);
   });
 });

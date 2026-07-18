@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { User } from "../user/user.types.js";
+import type { User } from "../user/index.js";
 import {
+  assertEmailCodeSendable,
   assertEmailEligibility,
-  assertTokenSendable,
   assertVerificationAttemptAllowed,
   isEmailPurpose,
 } from "./email.domain.js";
@@ -129,34 +129,34 @@ describe("assertEmailEligibility", () => {
   });
 });
 
-describe("assertTokenSendable", () => {
+describe("assertEmailCodeSendable", () => {
   const now = new Date("2026-01-01T00:01:00.000Z");
 
   it("発行履歴がなければ通す", () => {
-    assert.doesNotThrow(() => assertTokenSendable(null, now));
-    assert.doesNotThrow(() => assertTokenSendable(undefined, now));
+    assert.doesNotThrow(() => assertEmailCodeSendable(null, now));
+    assert.doesNotThrow(() => assertEmailCodeSendable(undefined, now));
   });
 
   it("クールダウン経過後なら通す", () => {
     const createdAt = new Date(
       now.getTime() - EMAIL_CODE_RESEND_COOLDOWN_SECONDS * 1000,
     );
-    assert.doesNotThrow(() => assertTokenSendable(createdAt, now));
+    assert.doesNotThrow(() => assertEmailCodeSendable(createdAt, now));
   });
 
   it("クールダウン中なら拒否する", () => {
     const createdAt = new Date(now.getTime() - 30_000);
     assert.throws(
-      () => assertTokenSendable(createdAt, now),
+      () => assertEmailCodeSendable(createdAt, now),
       TokenSendNotAllowedError,
     );
   });
 
   it("カスタムのクールダウン秒数を使える", () => {
     const createdAt = new Date(now.getTime() - 5_000);
-    assert.doesNotThrow(() => assertTokenSendable(createdAt, now, 5));
+    assert.doesNotThrow(() => assertEmailCodeSendable(createdAt, now, 5));
     assert.throws(
-      () => assertTokenSendable(createdAt, now, 10),
+      () => assertEmailCodeSendable(createdAt, now, 10),
       TokenSendNotAllowedError,
     );
   });

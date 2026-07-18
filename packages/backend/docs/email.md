@@ -11,6 +11,9 @@
 | `password-reset` | パスワードリセット |
 | `unlock` | ユーザーロック解除 |
 
+認証コードの永続化は `EmailCodeRepository`（`repositories/email-code`）が担当する。  
+JWT などのセッショントークンとは別物。
+
 ---
 
 ## 共通レイヤー
@@ -21,7 +24,7 @@ Route → Controller → Service → Repository
 
 1. **Controller** — `purpose` / body の検証
 2. **Service** — メール登録有無・送信可否判定、コード生成・検証
-3. **Repository** — ユーザー・トークンの永続化
+3. **Repository** — ユーザー・認証コードの永続化
 
 ---
 
@@ -46,7 +49,7 @@ sequenceDiagram
   Svc->>Repo: findLatestByEmailAndPurpose
   Svc->>Svc: 再送クールダウン判定
   Svc->>Svc: 6桁コード生成・ハッシュ化
-  Svc->>Repo: 既存トークン無効化・保存
+  Svc->>Repo: 既存認証コード無効化・保存
   Svc->>Svc: メール送信（TODO）
   Svc-->>Ctrl: ok
   Ctrl-->>C: 202 { ok: true }
@@ -61,19 +64,19 @@ sequenceDiagram
 | `password-reset` | **登録済み**であること | `404 email_not_registered` |
 | `unlock` | **登録済み**かつ **ロック中** (`lockedAt` あり) | `404` / `400 user_not_locked` |
 
-### トークン送信可否
+### 認証コード送信可否
 
 次をすべて満たすとき送信可能。
 
 1. 上記の登録有無チェックを通過している
-2. 同一 `email` + `purpose` の直近トークンから **60秒以上**経過している  
+2. 同一 `email` + `purpose` の直近認証コードから **60秒以上**経過している  
    - 未経過なら `429 token_send_not_allowed`
 
 通過後の処理:
 
 1. 6桁コードを生成し bcrypt でハッシュして保存（平文は保存しない）
-2. 同 `email` + `purpose` の未使用トークンを無効化
-3. 有効期限 **10分** のトークンを作成
+2. 同 `email` + `purpose` の未使用認証コードを無効化
+3. 有効期限 **10分** の認証コードを作成
 4. メール送信（未実装）
 
 ---
@@ -94,7 +97,7 @@ sequenceDiagram
   C->>Ctrl: POST /email/verify/:purpose
   Ctrl->>Ctrl: purpose / email / code を検証
   Ctrl->>Svc: verifyCode
-  Svc->>Repo: email+purpose の有効トークン取得
+  Svc->>Repo: email+purpose の有効認証コード取得
   Svc->>Svc: 試行回数チェック（5回以上なら拒否）
   Svc->>Svc: bcrypt でコード照合
   alt 試行上限超過
@@ -105,7 +108,7 @@ sequenceDiagram
     Svc-->>Ctrl: error
     Ctrl-->>C: 400 invalid_verification_code
   else 一致
-    Svc->>Repo: トークンを使用済みに
+    Svc->>Repo: 認証コードを使用済みに
     Svc->>Svc: purpose ごとの副作用（TODO）
     Svc-->>Ctrl: ok
     Ctrl-->>C: 200 { ok: true }
@@ -114,7 +117,7 @@ sequenceDiagram
 
 **検証処理（実装済み）**
 
-1. `email` + `purpose` の直近トークンを取得（未使用・期限内）
+1. `email` + `purpose` の直近認証コードを取得（未使用・期限内）
 2. `attemptCount >= 5` なら `429 verification_attempts_exceeded`
 3. 平文コードを bcrypt で照合
 4. 不一致なら `attemptCount` を +1 して `400 invalid_verification_code`

@@ -1,10 +1,10 @@
 export type {
+  AssertEmailCodeSendable,
   AssertEmailEligibility,
-  AssertTokenSendable,
   AssertVerificationAttemptAllowed,
+  EmailCode,
+  EmailCodeId,
   EmailPurpose,
-  EmailToken,
-  EmailTokenId,
   IsEmailPurpose,
 } from "./email.types.js";
 export {
@@ -14,8 +14,8 @@ export {
   EMAIL_PURPOSES,
 } from "./email.types.js";
 export {
+  assertEmailCodeSendable,
   assertEmailEligibility,
-  assertTokenSendable,
   assertVerificationAttemptAllowed,
   isEmailPurpose,
 } from "./email.domain.js";
