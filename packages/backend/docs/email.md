@@ -95,8 +95,13 @@ sequenceDiagram
   Ctrl->>Ctrl: purpose / email / code を検証
   Ctrl->>Svc: verifyCode
   Svc->>Repo: email+purpose の有効トークン取得
+  Svc->>Svc: 試行回数チェック（5回以上なら拒否）
   Svc->>Svc: bcrypt でコード照合
-  alt 不一致 or 期限切れ
+  alt 試行上限超過
+    Svc-->>Ctrl: error
+    Ctrl-->>C: 429 verification_attempts_exceeded
+  else 不一致 or 期限切れ
+    Svc->>Repo: attemptCount を加算
     Svc-->>Ctrl: error
     Ctrl-->>C: 400 invalid_verification_code
   else 一致
@@ -110,8 +115,10 @@ sequenceDiagram
 **検証処理（実装済み）**
 
 1. `email` + `purpose` の直近トークンを取得（未使用・期限内）
-2. 平文コードを bcrypt で照合（ソルト付きのためハッシュ値検索はしない）
-3. 一致したら使用済みにする
+2. `attemptCount >= 5` なら `429 verification_attempts_exceeded`
+3. 平文コードを bcrypt で照合
+4. 不一致なら `attemptCount` を +1 して `400 invalid_verification_code`
+5. 一致したら使用済みにする
 
 **purpose ごとの副作用（未実装 → 501）**
 
@@ -131,6 +138,7 @@ sequenceDiagram
 | コード桁数 | 6 |
 | 有効期限 | 10分 |
 | 再送クールダウン | 60秒 |
+| 検証最大試行回数 | 5回 |
 
 ---
 

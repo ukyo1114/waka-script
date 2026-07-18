@@ -8,6 +8,7 @@ export {
   NotImplementedError,
   TokenSendNotAllowedError,
   UserNotLockedError,
+  VerificationAttemptsExceededError,
 } from "./errors.js";
 export {
   badRequest,

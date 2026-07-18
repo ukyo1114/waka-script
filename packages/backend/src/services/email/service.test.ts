@@ -43,6 +43,7 @@ function createToken(overrides: Partial<EmailToken> = {}): EmailToken {
     tokenHash: "hash",
     expiresAt: new Date(now.getTime() + 600_000),
     usedAt: null,
+    attemptCount: 0,
     createdAt: now,
     ...overrides,
   };
@@ -71,8 +72,13 @@ class FakeUserRepository implements UserRepository {
 class FakeEmailTokenRepository implements EmailTokenRepository {
   created: CreateEmailTokenInput[] = [];
   invalidated = 0;
+  attemptIncrements = 0;
 
   constructor(private latest: EmailToken | null = null) {}
+
+  get latestToken(): EmailToken | null {
+    return this.latest;
+  }
 
   async create(input: CreateEmailTokenInput): Promise<EmailToken> {
     this.created.push(input);
@@ -82,6 +88,7 @@ class FakeEmailTokenRepository implements EmailTokenRepository {
       purpose: input.purpose,
       tokenHash: input.tokenHash,
       expiresAt: input.expiresAt,
+      attemptCount: 0,
     });
   }
 
@@ -95,6 +102,16 @@ class FakeEmailTokenRepository implements EmailTokenRepository {
 
   async markUsed(): Promise<EmailToken | null> {
     return null;
+  }
+
+  async incrementAttemptCount(id: string): Promise<EmailToken | null> {
+    this.attemptIncrements += 1;
+    if (!this.latest || this.latest.id !== id) return null;
+    this.latest = {
+      ...this.latest,
+      attemptCount: this.latest.attemptCount + 1,
+    };
+    return this.latest;
   }
 
   async invalidateActiveForEmail(): Promise<number> {
@@ -223,5 +240,57 @@ describe("EmailService.sendVerificationCode", () => {
       email: "new@example.com",
     });
     assert.equal(tokens.created.length, 1);
+  });
+});
+
+describe("EmailService.verifyCode", () => {
+  it("試行回数が上限に達していると拒否する", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const tokenHash = await hashSecret("123456");
+    const latest = createToken({
+      email: "new@example.com",
+      purpose: "register",
+      tokenHash,
+      attemptCount: 5,
+    });
+    const { emailService } = service(null, latest);
+    const { VerificationAttemptsExceededError } = await import(
+      "../../shared/errors.js"
+    );
+    await assert.rejects(
+      () =>
+        emailService.verifyCode({
+          purpose: "register",
+          email: "new@example.com",
+          code: "123456",
+        }),
+      VerificationAttemptsExceededError,
+    );
+  });
+
+  it("コード不一致なら試行回数を増やして拒否する", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const tokenHash = await hashSecret("123456");
+    const latest = createToken({
+      email: "new@example.com",
+      purpose: "register",
+      tokenHash,
+      attemptCount: 0,
+    });
+    const { emailService, tokens } = service(null, latest);
+    const { InvalidVerificationCodeError } = await import(
+      "../../shared/errors.js"
+    );
+    await assert.rejects(
+      () =>
+        emailService.verifyCode({
+          purpose: "register",
+          email: "new@example.com",
+          code: "000000",
+        }),
+      InvalidVerificationCodeError,
+    );
+    assert.equal(tokens.attemptIncrements, 1);
+    assert.equal(tokens.latestToken?.attemptCount, 1);
   });
 });

@@ -52,3 +52,14 @@ export class InvalidVerificationCodeError extends AppError {
     this.name = "InvalidVerificationCodeError";
   }
 }
+
+export class VerificationAttemptsExceededError extends AppError {
+  constructor(maxAttempts: number) {
+    super(
+      429,
+      "verification_attempts_exceeded",
+      `verification attempts exceeded (max ${maxAttempts})`,
+    );
+    this.name = "VerificationAttemptsExceededError";
+  }
+}

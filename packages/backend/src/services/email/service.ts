@@ -1,6 +1,7 @@
 import {
   assertEmailEligibility,
   assertTokenSendable,
+  assertVerificationAttemptAllowed,
   EMAIL_CODE_TTL_MINUTES,
   type EmailPurpose,
 } from "../../domain/email/index.js";
@@ -85,13 +86,15 @@ export class EmailService {
       purpose,
     );
 
-    const isValid =
-      token !== null &&
-      token.usedAt === null &&
-      token.expiresAt > now &&
-      (await verifySecret(input.code, token.tokenHash));
+    if (!token || token.usedAt !== null || token.expiresAt <= now) {
+      throw new InvalidVerificationCodeError();
+    }
 
-    if (!isValid || !token) {
+    assertVerificationAttemptAllowed(token.attemptCount);
+
+    const matched = await verifySecret(input.code, token.tokenHash);
+    if (!matched) {
+      await this.deps.emailTokens.incrementAttemptCount(token.id);
       throw new InvalidVerificationCodeError();
     }
 

@@ -3,12 +3,15 @@ import {
   EmailNotRegisteredError,
   TokenSendNotAllowedError,
   UserNotLockedError,
+  VerificationAttemptsExceededError,
 } from "../../shared/errors.js";
 import {
+  EMAIL_CODE_MAX_ATTEMPTS,
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
   EMAIL_PURPOSES,
   type AssertEmailEligibility,
   type AssertTokenSendable,
+  type AssertVerificationAttemptAllowed,
   type EmailPurpose,
   type IsEmailPurpose,
 } from "./email.types.js";
@@ -73,3 +76,14 @@ export const assertTokenSendable: AssertTokenSendable = (
     );
   }
 };
+
+/**
+ * 検証試行回数が上限に達していないか判定する。
+ * attemptCount はリポジトリ取得済みの値を渡す。
+ */
+export const assertVerificationAttemptAllowed: AssertVerificationAttemptAllowed =
+  (attemptCount, maxAttempts = EMAIL_CODE_MAX_ATTEMPTS) => {
+    if (attemptCount >= maxAttempts) {
+      throw new VerificationAttemptsExceededError(maxAttempts);
+    }
+  };

@@ -4,6 +4,7 @@ import type { User } from "../user/user.types.js";
 import {
   assertEmailEligibility,
   assertTokenSendable,
+  assertVerificationAttemptAllowed,
   isEmailPurpose,
 } from "./email.domain.js";
 import { EMAIL_CODE_RESEND_COOLDOWN_SECONDS } from "./email.types.js";
@@ -12,6 +13,7 @@ import {
   EmailNotRegisteredError,
   TokenSendNotAllowedError,
   UserNotLockedError,
+  VerificationAttemptsExceededError,
 } from "../../shared/errors.js";
 
 const createUser = (overrides: Partial<User> = {}): User => {
@@ -156,6 +158,24 @@ describe("assertTokenSendable", () => {
     assert.throws(
       () => assertTokenSendable(createdAt, now, 10),
       TokenSendNotAllowedError,
+    );
+  });
+});
+
+describe("assertVerificationAttemptAllowed", () => {
+  it("試行回数が上限未満なら通す", () => {
+    assert.doesNotThrow(() => assertVerificationAttemptAllowed(0));
+    assert.doesNotThrow(() => assertVerificationAttemptAllowed(4));
+  });
+
+  it("試行回数が上限以上なら拒否する", () => {
+    assert.throws(
+      () => assertVerificationAttemptAllowed(5),
+      VerificationAttemptsExceededError,
+    );
+    assert.throws(
+      () => assertVerificationAttemptAllowed(6),
+      VerificationAttemptsExceededError,
     );
   });
 });

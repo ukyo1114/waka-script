@@ -30,6 +30,10 @@ export class EmailTokenRepositoryImpl implements EmailTokenRepository {
     return notImplemented();
   }
 
+  incrementAttemptCount(_id: string): Promise<EmailToken | null> {
+    return notImplemented();
+  }
+
   invalidateActiveForEmail(
     _email: string,
     _purpose: EmailPurpose,

@@ -21,6 +21,7 @@ export interface EmailTokenRepository {
     purpose: EmailPurpose,
   ): Promise<EmailToken | null>;
   markUsed(id: string, usedAt?: Date): Promise<EmailToken | null>;
+  incrementAttemptCount(id: string): Promise<EmailToken | null>;
   invalidateActiveForEmail(
     email: string,
     purpose: EmailPurpose,

@@ -1,4 +1,4 @@
-import type { User, UserId } from "../user/user.types.js";
+import type { User, UserId } from "../user/index.js";
 
 export const EMAIL_PURPOSES = [
   "register",
@@ -21,6 +21,7 @@ export type EmailToken = {
   tokenHash: string;
   expiresAt: Date;
   usedAt: Date | null;
+  attemptCount: number;
   createdAt: Date;
 };
 
@@ -36,8 +37,16 @@ export type AssertTokenSendable = (
   cooldownSeconds?: number,
 ) => void;
 
+export type AssertVerificationAttemptAllowed = (
+  attemptCount: number,
+  maxAttempts?: number,
+) => void;
+
 /** 認証コードの有効期限（分） */
 export const EMAIL_CODE_TTL_MINUTES = 10;
 
 /** 同一 email+purpose での再送クールダウン（秒） */
 export const EMAIL_CODE_RESEND_COOLDOWN_SECONDS = 60;
+
+/** 認証コード検証の最大試行回数 */
+export const EMAIL_CODE_MAX_ATTEMPTS = 5;
