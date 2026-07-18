@@ -1,5 +1,5 @@
-import type { EmailCodeRepository } from "./email-code/types.js";
-import type { UserRepository } from "./user/types.js";
+import type { EmailCodeRepository } from "./email-code/index.js";
+import type { UserRepository } from "./user/index.js";
 
 export type Repositories = {
   users: UserRepository;

@@ -1,5 +1,5 @@
 export type {
   CreateEmailCodeInput,
   EmailCodeRepository,
-} from "./types.js";
-export { EmailCodeRepositoryImpl } from "./repository.js";
+} from "./email-code.repository.types.js";
+export { EmailCodeRepositoryImpl } from "./email-code.repository.js";

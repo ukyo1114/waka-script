@@ -1,5 +1,8 @@
 import type { EmailCode, EmailPurpose } from "../../domain/email/index.js";
-import type { CreateEmailCodeInput, EmailCodeRepository } from "./types.js";
+import type {
+  CreateEmailCodeInput,
+  EmailCodeRepository,
+} from "./email-code.repository.types.js";
 
 function notImplemented(): never {
   throw new Error("EmailCodeRepository is not implemented yet");

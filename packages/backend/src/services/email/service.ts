@@ -5,8 +5,8 @@ import {
   EMAIL_CODE_TTL_MINUTES,
   type EmailPurpose,
 } from "../../domain/email/index.js";
-import type { EmailCodeRepository } from "../../repositories/email-code/types.js";
-import type { UserRepository } from "../../repositories/user/types.js";
+import type { EmailCodeRepository } from "../../repositories/email-code/index.js";
+import type { UserRepository } from "../../repositories/user/index.js";
 import {
   InvalidVerificationCodeError,
   NotImplementedError,

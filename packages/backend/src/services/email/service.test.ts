@@ -5,8 +5,8 @@ import type { User } from "../../domain/user/index.js";
 import type {
   CreateEmailCodeInput,
   EmailCodeRepository,
-} from "../../repositories/email-code/types.js";
-import type { UserRepository } from "../../repositories/user/types.js";
+} from "../../repositories/email-code/index.js";
+import type { UserRepository } from "../../repositories/user/index.js";
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,

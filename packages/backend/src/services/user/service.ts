@@ -1,5 +1,5 @@
 import type { User } from "../../domain/user/index.js";
-import type { UserRepository } from "../../repositories/user/types.js";
+import type { UserRepository } from "../../repositories/user/index.js";
 import { NotImplementedError } from "../../shared/errors.js";
 
 export type RegisterUserInput = {

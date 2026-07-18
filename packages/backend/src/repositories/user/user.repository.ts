@@ -1,5 +1,8 @@
 import type { User, UserId } from "../../domain/user/index.js";
-import type { CreateUserInput, UserRepository } from "./types.js";
+import type {
+  CreateUserInput,
+  UserRepository,
+} from "./user.repository.types.js";
 
 function notImplemented(): never {
   throw new Error("UserRepository is not implemented yet");

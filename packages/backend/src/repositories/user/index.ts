@@ -1,2 +1,5 @@
-export type { CreateUserInput, UserRepository } from "./types.js";
-export { UserRepositoryImpl } from "./repository.js";
+export type {
+  CreateUserInput,
+  UserRepository,
+} from "./user.repository.types.js";
+export { UserRepositoryImpl } from "./user.repository.js";
