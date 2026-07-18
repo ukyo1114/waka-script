@@ -1,15 +1,15 @@
 import express from "express";
-import {
-  createRepositories,
-  type Repositories,
-} from "./repositories/index.js";
+import type { Repositories } from "./repositories/index.js";
 import { emailRouter } from "./routes/email.js";
 import { userRouter } from "./routes/user.js";
 
-export function createApp(repos: Repositories = createRepositories()) {
+export function createApp(repos?: Repositories) {
   const app = express();
 
-  app.locals.repos = repos;
+  if (repos) {
+    app.locals.repos = repos;
+  }
+
   app.use(express.json());
 
   app.get("/health", (_req, res) => {
