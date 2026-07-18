@@ -46,13 +46,13 @@ describe("isEmailPurpose", () => {
 });
 
 describe("isEmailActionPurpose", () => {
-  it("JWT 発行対象の purpose なら true を返す", () => {
+  it("トークン発行対象の purpose なら true を返す", () => {
     assert.equal(isEmailActionPurpose("register"), true);
     assert.equal(isEmailActionPurpose("email-change"), true);
     assert.equal(isEmailActionPurpose("password-reset"), true);
   });
 
-  it("unlock は JWT 発行対象外", () => {
+  it("unlock はトークン発行対象外", () => {
     assert.equal(isEmailActionPurpose("unlock"), false);
   });
 });

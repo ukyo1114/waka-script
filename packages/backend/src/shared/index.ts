@@ -1,16 +1,16 @@
 export { createRandomCode } from "./random-code.js";
-export { hashSecret, verifySecret, BCRYPT_COST } from "./hash.js";
 export {
-  signEmailActionToken,
-  verifyEmailActionToken,
-  type EmailActionTokenClaims,
-  type SignEmailActionTokenInput,
-  type VerifyEmailActionTokenInput,
-} from "./jwt.js";
+  createRandomToken,
+  formatEmailToken,
+  parseEmailToken,
+  type ParsedEmailToken,
+} from "./random-token.js";
+export { hashSecret, verifySecret, BCRYPT_COST } from "./hash.js";
 export {
   AppError,
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
+  InvalidEmailTokenError,
   InvalidVerificationCodeError,
   NotImplementedError,
   TokenSendNotAllowedError,

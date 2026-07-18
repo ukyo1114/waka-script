@@ -9,7 +9,7 @@ export const EMAIL_PURPOSES = [
 
 export type EmailPurpose = (typeof EMAIL_PURPOSES)[number];
 
-/** 検証成功後にアクション用 JWT を発行する purpose（unlock は対象外） */
+/** 検証成功後にアクション用トークンを発行する purpose（unlock は対象外） */
 export const EMAIL_ACTION_PURPOSES = [
   "register",
   "email-change",
@@ -50,5 +50,5 @@ export const EMAIL_CODE_RESEND_COOLDOWN_SECONDS = 60;
 /** 認証コード検証の最大試行回数 */
 export const EMAIL_CODE_MAX_ATTEMPTS = 5;
 
-/** メール確認後アクション用 JWT の有効期限（秒） */
+/** メール確認後アクション用トークンの有効期限（秒） */
 export const EMAIL_ACTION_TOKEN_TTL_SECONDS = 15 * 60;

@@ -2,16 +2,29 @@ import {
   assertEmailCodeSendable,
   assertEmailEligibility,
   assertVerificationAttemptAllowed,
+  EMAIL_ACTION_TOKEN_TTL_SECONDS,
   EMAIL_CODE_TTL_MINUTES,
   isEmailActionPurpose,
+  type EmailActionPurpose,
   type EmailPurpose,
 } from "../../domain/email/index.js";
 import type { EmailCodeRepository } from "../../repositories/email-code/index.js";
+import type {
+  EmailToken,
+  EmailTokenRepository,
+} from "../../repositories/email-token/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
-import { InvalidVerificationCodeError } from "../../shared/errors.js";
+import {
+  InvalidEmailTokenError,
+  InvalidVerificationCodeError,
+} from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
-import { signEmailActionToken } from "../../shared/jwt.js";
 import { createRandomCode } from "../../shared/random-code.js";
+import {
+  createRandomToken,
+  formatEmailToken,
+  parseEmailToken,
+} from "../../shared/random-token.js";
 
 export type SendVerificationCodeInput = {
   purpose: EmailPurpose;
@@ -29,11 +42,16 @@ export type VerifyCodeResult = {
   token: string | null;
 };
 
+export type ResolveActionTokenInput = {
+  token: string;
+  /** 指定時は purpose が一致しないと無効 */
+  purpose?: EmailActionPurpose;
+};
+
 export type EmailServiceDeps = {
   users: UserRepository;
   emailCodes: EmailCodeRepository;
-  /** テスト用 JWT 秘密鍵。省略時は JWT_SECRET */
-  jwtSecret?: string;
+  emailTokens: EmailTokenRepository;
 };
 
 function normalizeEmail(email: string): string {
@@ -41,7 +59,7 @@ function normalizeEmail(email: string): string {
 }
 
 /**
- * メール認証コードの送信・検証を担う。
+ * メール認証コードの送信・検証と、アクション用トークンの解決を担う。
  * purpose: register | email-change | password-reset | unlock
  */
 export class EmailService {
@@ -125,13 +143,49 @@ export class EmailService {
       return { token: null };
     }
 
-    const token = await signEmailActionToken({
+    const secret = createRandomToken();
+    const tokenHash = await hashSecret(secret);
+    const expiresAt = new Date(
+      now.getTime() + EMAIL_ACTION_TOKEN_TTL_SECONDS * 1000,
+    );
+
+    await this.deps.emailTokens.invalidateActiveForEmail(email, purpose);
+    const record = await this.deps.emailTokens.create({
       email,
-      purpose,
       userId: emailCode.userId,
-      secret: this.deps.jwtSecret,
+      purpose,
+      tokenHash,
+      expiresAt,
     });
 
-    return { token };
+    return { token: formatEmailToken(record.id, secret) };
+  }
+
+  /**
+   * 後続 API（本登録・メアド変更・パスワード再設定）でトークンを検証する。
+   * 使用済みマークは呼び出し側で markUsed する。
+   */
+  async resolveActionToken(
+    input: ResolveActionTokenInput,
+  ): Promise<EmailToken> {
+    const parsed = parseEmailToken(input.token);
+    if (!parsed) throw new InvalidEmailTokenError();
+
+    const record = await this.deps.emailTokens.findById(parsed.id);
+    const now = new Date();
+
+    if (
+      !record ||
+      record.usedAt !== null ||
+      record.expiresAt <= now ||
+      (input.purpose !== undefined && record.purpose !== input.purpose)
+    ) {
+      throw new InvalidEmailTokenError();
+    }
+
+    const matched = await verifySecret(parsed.secret, record.tokenHash);
+    if (!matched) throw new InvalidEmailTokenError();
+
+    return record;
   }
 }

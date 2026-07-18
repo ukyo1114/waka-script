@@ -12,7 +12,7 @@
 | `unlock` | ユーザーロック解除 |
 
 認証コードの永続化レコード型 `EmailCode` とリポジトリは `repositories/email-code` が担当する。  
-JWT などのセッショントークンとは別物。
+検証成功後のアクション用トークンは `repositories/email-token` が担当する（平文は保存せずハッシュのみ）。
 
 ---
 
@@ -94,8 +94,8 @@ sequenceDiagram
 | `register` / `email-change` / `password-reset` | `200 { ok: true, token: string }` |
 | `unlock` | `200 { ok: true, token: null }` |
 
-`token` は後続 API（本登録・メアド変更・パスワード再設定）で提示する **アクション用 JWT**。  
-セッション用 JWT とは別物。有効期限は **15分**。クレーム: `email`, `purpose`, `userId`。
+`token` は後続 API（本登録・メアド変更・パスワード再設定）で提示する **メール認証トークン**。  
+形式は `{id}.{secret}`。DB には `tokenHash` のみ保存し、ワンタイム利用・失効が可能。有効期限は **15分**。
 
 ```mermaid
 sequenceDiagram
@@ -119,8 +119,8 @@ sequenceDiagram
     Ctrl-->>C: 400 invalid_verification_code
   else 一致 (register / email-change / password-reset)
     Svc->>Repo: 認証コードを使用済みに
-    Svc->>Svc: アクション用 JWT を発行
-    Svc-->>Ctrl: { token }
+    Svc->>Repo: 既存アクション用トークンを無効化・作成
+    Svc-->>Ctrl: { token: id.secret }
     Ctrl-->>C: 200 { ok: true, token }
   else 一致 (unlock)
     Svc->>Repo: 認証コードを使用済みに
@@ -143,10 +143,10 @@ sequenceDiagram
 
 | purpose | 検証成功後 |
 |---------|------------|
-| `register` | アクション用 JWT を返す（本登録 API で使用） |
-| `email-change` | アクション用 JWT を返す（メアド変更 API で使用） |
-| `password-reset` | アクション用 JWT を返す（パスワード再設定 API で使用） |
-| `unlock` | アカウントロックを解除。JWT は不要（この時点で完結） |
+| `register` | アクション用トークンを DB に保存して返す（本登録 API で使用） |
+| `email-change` | アクション用トークンを DB に保存して返す（メアド変更 API で使用） |
+| `password-reset` | アクション用トークンを DB に保存して返す（パスワード再設定 API で使用） |
+| `unlock` | アカウントロックを解除。トークンは不要（この時点で完結） |
 
 ---
 
@@ -158,17 +158,16 @@ sequenceDiagram
 | 有効期限 | 10分 |
 | 再送クールダウン | 60秒 |
 | 検証最大試行回数 | 5回 |
-| アクション用 JWT 有効期限 | 15分 |
+| アクション用トークン有効期限 | 15分 |
 
 ---
 
 ## 補足
 
 - コード生成: `shared/createRandomCode`
+- トークン生成: `shared/createRandomToken` / `formatEmailToken` / `parseEmailToken`
 - ハッシュ / 照合: `shared/hashSecret` / `shared/verifySecret`（bcrypt）
   - 一方向ハッシュのため復号は不可。照合のみ行う
-  - 認証コード・パスワード・アクセストークン等で共通利用する想定
-- アクション用 JWT: `shared/signEmailActionToken` / `verifyEmailActionToken`（`jose` / HS256）
-  - 秘密鍵は環境変数 `JWT_SECRET`
-  - `typ: email_action` でセッション JWT と区別
+  - 認証コード・パスワード・アクション用トークンで共通利用する想定
+- 後続 API でのトークン検証: `EmailService.resolveActionToken`（使用済み化は呼び出し側で `emailTokens.markUsed`）
 - `email-change` の「ログイン必須」は今後ミドルウェアで担保する

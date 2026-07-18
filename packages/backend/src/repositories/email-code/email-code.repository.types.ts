@@ -3,7 +3,7 @@ import type { UserId } from "../../domain/user/index.js";
 
 export type EmailCodeId = string;
 
-/** メール認証コードの永続化レコード（JWT などのセッショントークンとは別） */
+/** メール認証コードの永続化レコード（アクション用 EmailToken とは別） */
 export type EmailCode = {
   id: EmailCodeId;
   email: string;

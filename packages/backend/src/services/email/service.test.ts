@@ -7,15 +7,22 @@ import type {
   EmailCodeRepository,
 } from "../../repositories/email-code/index.js";
 import type {
+  CreateEmailTokenInput,
+  EmailToken,
+  EmailTokenRepository,
+} from "../../repositories/email-token/index.js";
+import type {
   UserRecord,
   UserRepository,
 } from "../../repositories/user/index.js";
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
+  InvalidEmailTokenError,
   TokenSendNotAllowedError,
   UserNotLockedError,
 } from "../../shared/errors.js";
+import { parseEmailToken } from "../../shared/random-token.js";
 import { EmailService } from "./service.js";
 
 function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
@@ -44,6 +51,21 @@ function createEmailCode(overrides: Partial<EmailCode> = {}): EmailCode {
     expiresAt: new Date(now.getTime() + 600_000),
     usedAt: null,
     attemptCount: 0,
+    createdAt: now,
+    ...overrides,
+  };
+}
+
+function createEmailToken(overrides: Partial<EmailToken> = {}): EmailToken {
+  const now = new Date();
+  return {
+    id: "token-1",
+    email: "user@example.com",
+    userId: "user-1",
+    purpose: "register",
+    tokenHash: "hash",
+    expiresAt: new Date(now.getTime() + 900_000),
+    usedAt: null,
     createdAt: now,
     ...overrides,
   };
@@ -128,6 +150,45 @@ class FakeEmailCodeRepository implements EmailCodeRepository {
   }
 }
 
+class FakeEmailTokenRepository implements EmailTokenRepository {
+  created: CreateEmailTokenInput[] = [];
+  invalidated = 0;
+  private byId = new Map<string, EmailToken>();
+  private seq = 0;
+
+  async create(input: CreateEmailTokenInput): Promise<EmailToken> {
+    this.created.push(input);
+    this.seq += 1;
+    const record = createEmailToken({
+      id: `token-${this.seq}`,
+      email: input.email,
+      userId: input.userId,
+      purpose: input.purpose,
+      tokenHash: input.tokenHash,
+      expiresAt: input.expiresAt,
+    });
+    this.byId.set(record.id, record);
+    return record;
+  }
+
+  async findById(id: string): Promise<EmailToken | null> {
+    return this.byId.get(id) ?? null;
+  }
+
+  async markUsed(id: string, usedAt = new Date()): Promise<EmailToken | null> {
+    const current = this.byId.get(id);
+    if (!current) return null;
+    const updated = { ...current, usedAt };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async invalidateActiveForEmail(): Promise<number> {
+    this.invalidated += 1;
+    return 1;
+  }
+}
+
 function service(
   user: UserRecord | null,
   latest: EmailCode | null = null,
@@ -135,15 +196,17 @@ function service(
   emailService: EmailService;
   codes: FakeEmailCodeRepository;
   users: FakeUserRepository;
+  tokens: FakeEmailTokenRepository;
 } {
   const codes = new FakeEmailCodeRepository(latest);
   const users = new FakeUserRepository(user);
+  const tokens = new FakeEmailTokenRepository();
   const emailService = new EmailService({
     users,
     emailCodes: codes,
-    jwtSecret: "test-jwt-secret",
+    emailTokens: tokens,
   });
-  return { emailService, codes, users };
+  return { emailService, codes, users, tokens };
 }
 
 describe("EmailService.sendVerificationCode", () => {
@@ -308,9 +371,96 @@ describe("EmailService.verifyCode", () => {
     assert.equal(codes.latestCode?.attemptCount, 1);
   });
 
-  it("register: 検証成功したらアクション用 JWT を返す", async () => {
+  it("register: 検証成功したら DB 保存用トークンを返す", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
-    const { verifyEmailActionToken } = await import("../../shared/jwt.js");
+    const codeHash = await hashSecret("123456");
+    const latest = createEmailCode({
+      email: "new@example.com",
+      purpose: "register",
+      userId: null,
+      codeHash,
+    });
+    const { emailService, tokens } = service(null, latest);
+    const result = await emailService.verifyCode({
+      purpose: "register",
+      email: "new@example.com",
+      code: "123456",
+    });
+    assert.ok(result.token);
+    assert.equal(tokens.created.length, 1);
+    assert.equal(tokens.created[0]?.email, "new@example.com");
+    assert.equal(tokens.created[0]?.purpose, "register");
+    assert.equal(tokens.invalidated, 1);
+
+    const parsed = parseEmailToken(result.token);
+    assert.ok(parsed);
+    const resolved = await emailService.resolveActionToken({
+      token: result.token,
+      purpose: "register",
+    });
+    assert.equal(resolved.email, "new@example.com");
+    assert.equal(resolved.userId, null);
+  });
+
+  it("password-reset: 検証成功したらトークンに userId を紐づける", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const user = createUser();
+    const codeHash = await hashSecret("654321");
+    const latest = createEmailCode({
+      email: user.email,
+      purpose: "password-reset",
+      userId: user.id,
+      codeHash,
+    });
+    const { emailService, tokens } = service(user, latest);
+    const result = await emailService.verifyCode({
+      purpose: "password-reset",
+      email: user.email,
+      code: "654321",
+    });
+    assert.ok(result.token);
+    assert.equal(tokens.created[0]?.userId, user.id);
+
+    const resolved = await emailService.resolveActionToken({
+      token: result.token,
+      purpose: "password-reset",
+    });
+    assert.equal(resolved.userId, user.id);
+  });
+
+  it("unlock: 検証成功したらロック解除しトークンは返さない", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const user = createUser({ lockedAt: new Date() });
+    const codeHash = await hashSecret("111111");
+    const latest = createEmailCode({
+      email: user.email,
+      purpose: "unlock",
+      userId: user.id,
+      codeHash,
+    });
+    const { emailService, users, tokens } = service(user, latest);
+    const result = await emailService.verifyCode({
+      purpose: "unlock",
+      email: user.email,
+      code: "111111",
+    });
+    assert.equal(result.token, null);
+    assert.equal(tokens.created.length, 0);
+    assert.deepEqual(users.clearLockCalls, [user.id]);
+  });
+});
+
+describe("EmailService.resolveActionToken", () => {
+  it("不正な形式なら拒否する", async () => {
+    const { emailService } = service(null);
+    await assert.rejects(
+      () => emailService.resolveActionToken({ token: "invalid" }),
+      InvalidEmailTokenError,
+    );
+  });
+
+  it("secret が一致しないなら拒否する", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
     const codeHash = await hashSecret("123456");
     const latest = createEmailCode({
       email: "new@example.com",
@@ -325,58 +475,14 @@ describe("EmailService.verifyCode", () => {
       code: "123456",
     });
     assert.ok(result.token);
-    const claims = await verifyEmailActionToken({
-      token: result.token,
-      secret: "test-jwt-secret",
-    });
-    assert.equal(claims.email, "new@example.com");
-    assert.equal(claims.purpose, "register");
-    assert.equal(claims.userId, null);
-  });
-
-  it("password-reset: 検証成功したら JWT に userId を含める", async () => {
-    const { hashSecret } = await import("../../shared/hash.js");
-    const { verifyEmailActionToken } = await import("../../shared/jwt.js");
-    const user = createUser();
-    const codeHash = await hashSecret("654321");
-    const latest = createEmailCode({
-      email: user.email,
-      purpose: "password-reset",
-      userId: user.id,
-      codeHash,
-    });
-    const { emailService } = service(user, latest);
-    const result = await emailService.verifyCode({
-      purpose: "password-reset",
-      email: user.email,
-      code: "654321",
-    });
-    assert.ok(result.token);
-    const claims = await verifyEmailActionToken({
-      token: result.token,
-      secret: "test-jwt-secret",
-    });
-    assert.equal(claims.purpose, "password-reset");
-    assert.equal(claims.userId, user.id);
-  });
-
-  it("unlock: 検証成功したらロック解除し JWT は返さない", async () => {
-    const { hashSecret } = await import("../../shared/hash.js");
-    const user = createUser({ lockedAt: new Date() });
-    const codeHash = await hashSecret("111111");
-    const latest = createEmailCode({
-      email: user.email,
-      purpose: "unlock",
-      userId: user.id,
-      codeHash,
-    });
-    const { emailService, users } = service(user, latest);
-    const result = await emailService.verifyCode({
-      purpose: "unlock",
-      email: user.email,
-      code: "111111",
-    });
-    assert.equal(result.token, null);
-    assert.deepEqual(users.clearLockCalls, [user.id]);
+    const parsed = parseEmailToken(result.token);
+    assert.ok(parsed);
+    await assert.rejects(
+      () =>
+        emailService.resolveActionToken({
+          token: `${parsed.id}.wrong-secret`,
+        }),
+      InvalidEmailTokenError,
+    );
   });
 });

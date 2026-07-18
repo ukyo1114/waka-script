@@ -63,3 +63,10 @@ export class VerificationAttemptsExceededError extends AppError {
     this.name = "VerificationAttemptsExceededError";
   }
 }
+
+export class InvalidEmailTokenError extends AppError {
+  constructor() {
+    super(400, "invalid_email_token", "email action token is invalid or expired");
+    this.name = "InvalidEmailTokenError";
+  }
+}
