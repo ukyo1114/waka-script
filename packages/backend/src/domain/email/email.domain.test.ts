@@ -5,6 +5,7 @@ import {
   assertEmailCodeSendable,
   assertEmailEligibility,
   assertVerificationAttemptAllowed,
+  isEmailActionPurpose,
   isEmailPurpose,
 } from "./email.domain.js";
 import { EMAIL_CODE_RESEND_COOLDOWN_SECONDS } from "./email.types.js";
@@ -41,6 +42,18 @@ describe("isEmailPurpose", () => {
   it("未定義の purpose なら false を返す", () => {
     assert.equal(isEmailPurpose("unknown"), false);
     assert.equal(isEmailPurpose(""), false);
+  });
+});
+
+describe("isEmailActionPurpose", () => {
+  it("JWT 発行対象の purpose なら true を返す", () => {
+    assert.equal(isEmailActionPurpose("register"), true);
+    assert.equal(isEmailActionPurpose("email-change"), true);
+    assert.equal(isEmailActionPurpose("password-reset"), true);
+  });
+
+  it("unlock は JWT 発行対象外", () => {
+    assert.equal(isEmailActionPurpose("unlock"), false);
   });
 });
 

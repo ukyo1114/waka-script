@@ -87,6 +87,16 @@ sequenceDiagram
 
 **Body:** `{ "email": string, "code": string }`
 
+**成功レスポンス:**
+
+| purpose | レスポンス |
+|---------|------------|
+| `register` / `email-change` / `password-reset` | `200 { ok: true, token: string }` |
+| `unlock` | `200 { ok: true, token: null }` |
+
+`token` は後続 API（本登録・メアド変更・パスワード再設定）で提示する **アクション用 JWT**。  
+セッション用 JWT とは別物。有効期限は **15分**。クレーム: `email`, `purpose`, `userId`。
+
 ```mermaid
 sequenceDiagram
   participant C as Client
@@ -107,11 +117,16 @@ sequenceDiagram
     Svc->>Repo: attemptCount を加算
     Svc-->>Ctrl: error
     Ctrl-->>C: 400 invalid_verification_code
-  else 一致
+  else 一致 (register / email-change / password-reset)
     Svc->>Repo: 認証コードを使用済みに
-    Svc->>Svc: purpose ごとの副作用（TODO）
-    Svc-->>Ctrl: ok
-    Ctrl-->>C: 200 { ok: true }
+    Svc->>Svc: アクション用 JWT を発行
+    Svc-->>Ctrl: { token }
+    Ctrl-->>C: 200 { ok: true, token }
+  else 一致 (unlock)
+    Svc->>Repo: 認証コードを使用済みに
+    Svc->>Repo: clearLock
+    Svc-->>Ctrl: { token: null }
+    Ctrl-->>C: 200 { ok: true, token: null }
   end
 ```
 
@@ -122,15 +137,16 @@ sequenceDiagram
 3. 平文コードを bcrypt で照合
 4. 不一致なら `attemptCount` を +1 して `400 invalid_verification_code`
 5. 一致したら使用済みにする
+6. purpose に応じた後続処理（下表）
 
-**purpose ごとの副作用（未実装 → 501）**
+**purpose ごとの検証成功後**
 
 | purpose | 検証成功後 |
 |---------|------------|
-| `register` | メール確認済みにする（本登録の続きへ） |
-| `email-change` | ユーザーのメールを新アドレスへ更新 |
-| `password-reset` | パスワード再設定を許可 |
-| `unlock` | アカウントロックを解除 |
+| `register` | アクション用 JWT を返す（本登録 API で使用） |
+| `email-change` | アクション用 JWT を返す（メアド変更 API で使用） |
+| `password-reset` | アクション用 JWT を返す（パスワード再設定 API で使用） |
+| `unlock` | アカウントロックを解除。JWT は不要（この時点で完結） |
 
 ---
 
@@ -142,6 +158,7 @@ sequenceDiagram
 | 有効期限 | 10分 |
 | 再送クールダウン | 60秒 |
 | 検証最大試行回数 | 5回 |
+| アクション用 JWT 有効期限 | 15分 |
 
 ---
 
@@ -151,4 +168,7 @@ sequenceDiagram
 - ハッシュ / 照合: `shared/hashSecret` / `shared/verifySecret`（bcrypt）
   - 一方向ハッシュのため復号は不可。照合のみ行う
   - 認証コード・パスワード・アクセストークン等で共通利用する想定
+- アクション用 JWT: `shared/signEmailActionToken` / `verifyEmailActionToken`（`jose` / HS256）
+  - 秘密鍵は環境変数 `JWT_SECRET`
+  - `typ: email_action` でセッション JWT と区別
 - `email-change` の「ログイン必須」は今後ミドルウェアで担保する

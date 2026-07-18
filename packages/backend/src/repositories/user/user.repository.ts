@@ -36,4 +36,8 @@ export class UserRepositoryImpl implements UserRepository {
   ): Promise<UserRecord | null> {
     return notImplemented();
   }
+
+  clearLock(_id: UserId): Promise<UserRecord | null> {
+    return notImplemented();
+  }
 }

@@ -50,6 +50,8 @@ function createEmailCode(overrides: Partial<EmailCode> = {}): EmailCode {
 }
 
 class FakeUserRepository implements UserRepository {
+  clearLockCalls: string[] = [];
+
   constructor(private user: UserRecord | null = null) {}
 
   async create(): Promise<UserRecord> {
@@ -65,6 +67,12 @@ class FakeUserRepository implements UserRepository {
     return this.user;
   }
   async updatePasswordHash(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async clearLock(id: string): Promise<UserRecord | null> {
+    this.clearLockCalls.push(id);
+    if (!this.user || this.user.id !== id) return null;
+    this.user = { ...this.user, lockedAt: null };
     return this.user;
   }
 }
@@ -123,13 +131,19 @@ class FakeEmailCodeRepository implements EmailCodeRepository {
 function service(
   user: UserRecord | null,
   latest: EmailCode | null = null,
-): { emailService: EmailService; codes: FakeEmailCodeRepository } {
+): {
+  emailService: EmailService;
+  codes: FakeEmailCodeRepository;
+  users: FakeUserRepository;
+} {
   const codes = new FakeEmailCodeRepository(latest);
+  const users = new FakeUserRepository(user);
   const emailService = new EmailService({
-    users: new FakeUserRepository(user),
+    users,
     emailCodes: codes,
+    jwtSecret: "test-jwt-secret",
   });
-  return { emailService, codes };
+  return { emailService, codes, users };
 }
 
 describe("EmailService.sendVerificationCode", () => {
@@ -292,5 +306,77 @@ describe("EmailService.verifyCode", () => {
     );
     assert.equal(codes.attemptIncrements, 1);
     assert.equal(codes.latestCode?.attemptCount, 1);
+  });
+
+  it("register: 検証成功したらアクション用 JWT を返す", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const { verifyEmailActionToken } = await import("../../shared/jwt.js");
+    const codeHash = await hashSecret("123456");
+    const latest = createEmailCode({
+      email: "new@example.com",
+      purpose: "register",
+      userId: null,
+      codeHash,
+    });
+    const { emailService } = service(null, latest);
+    const result = await emailService.verifyCode({
+      purpose: "register",
+      email: "new@example.com",
+      code: "123456",
+    });
+    assert.ok(result.token);
+    const claims = await verifyEmailActionToken({
+      token: result.token,
+      secret: "test-jwt-secret",
+    });
+    assert.equal(claims.email, "new@example.com");
+    assert.equal(claims.purpose, "register");
+    assert.equal(claims.userId, null);
+  });
+
+  it("password-reset: 検証成功したら JWT に userId を含める", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const { verifyEmailActionToken } = await import("../../shared/jwt.js");
+    const user = createUser();
+    const codeHash = await hashSecret("654321");
+    const latest = createEmailCode({
+      email: user.email,
+      purpose: "password-reset",
+      userId: user.id,
+      codeHash,
+    });
+    const { emailService } = service(user, latest);
+    const result = await emailService.verifyCode({
+      purpose: "password-reset",
+      email: user.email,
+      code: "654321",
+    });
+    assert.ok(result.token);
+    const claims = await verifyEmailActionToken({
+      token: result.token,
+      secret: "test-jwt-secret",
+    });
+    assert.equal(claims.purpose, "password-reset");
+    assert.equal(claims.userId, user.id);
+  });
+
+  it("unlock: 検証成功したらロック解除し JWT は返さない", async () => {
+    const { hashSecret } = await import("../../shared/hash.js");
+    const user = createUser({ lockedAt: new Date() });
+    const codeHash = await hashSecret("111111");
+    const latest = createEmailCode({
+      email: user.email,
+      purpose: "unlock",
+      userId: user.id,
+      codeHash,
+    });
+    const { emailService, users } = service(user, latest);
+    const result = await emailService.verifyCode({
+      purpose: "unlock",
+      email: user.email,
+      code: "111111",
+    });
+    assert.equal(result.token, null);
+    assert.deepEqual(users.clearLockCalls, [user.id]);
   });
 });

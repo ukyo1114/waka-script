@@ -6,6 +6,7 @@ import {
   VerificationAttemptsExceededError,
 } from "../../shared/errors.js";
 import {
+  EMAIL_ACTION_PURPOSES,
   EMAIL_CODE_MAX_ATTEMPTS,
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
   EMAIL_PURPOSES,
@@ -13,6 +14,7 @@ import {
   type AssertEmailEligibility,
   type AssertVerificationAttemptAllowed,
   type EmailPurpose,
+  type IsEmailActionPurpose,
   type IsEmailPurpose,
 } from "./email.types.js";
 
@@ -20,6 +22,11 @@ export const isEmailPurpose: IsEmailPurpose = (
   value,
 ): value is EmailPurpose =>
   (EMAIL_PURPOSES as readonly string[]).includes(value);
+
+export const isEmailActionPurpose: IsEmailActionPurpose = (
+  purpose,
+): purpose is (typeof EMAIL_ACTION_PURPOSES)[number] =>
+  (EMAIL_ACTION_PURPOSES as readonly EmailPurpose[]).includes(purpose);
 
 /**
  * purpose に応じて「未登録必須」または「登録済み必須」などを判定する。

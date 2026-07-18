@@ -60,8 +60,15 @@ export async function verifyCode(req: Request, res: Response) {
   if (!code) return badRequest(res, "code is required");
 
   try {
-    await createEmailService(req).verifyCode({ purpose, email, code });
-    return res.status(200).json({ ok: true });
+    const result = await createEmailService(req).verifyCode({
+      purpose,
+      email,
+      code,
+    });
+    return res.status(200).json({
+      ok: true,
+      token: result.token,
+    });
   } catch (error) {
     return handleControllerError(res, error);
   }

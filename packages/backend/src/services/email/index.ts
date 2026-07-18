@@ -8,4 +8,5 @@ export {
   type EmailServiceDeps,
   type SendVerificationCodeInput,
   type VerifyCodeInput,
+  type VerifyCodeResult,
 } from "./service.js";

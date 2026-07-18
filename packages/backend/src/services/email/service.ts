@@ -3,15 +3,14 @@ import {
   assertEmailEligibility,
   assertVerificationAttemptAllowed,
   EMAIL_CODE_TTL_MINUTES,
+  isEmailActionPurpose,
   type EmailPurpose,
 } from "../../domain/email/index.js";
 import type { EmailCodeRepository } from "../../repositories/email-code/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
-import {
-  InvalidVerificationCodeError,
-  NotImplementedError,
-} from "../../shared/errors.js";
+import { InvalidVerificationCodeError } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
+import { signEmailActionToken } from "../../shared/jwt.js";
 import { createRandomCode } from "../../shared/random-code.js";
 
 export type SendVerificationCodeInput = {
@@ -25,9 +24,16 @@ export type VerifyCodeInput = {
   code: string;
 };
 
+export type VerifyCodeResult = {
+  /** register / email-change / password-reset で発行。unlock は null */
+  token: string | null;
+};
+
 export type EmailServiceDeps = {
   users: UserRepository;
   emailCodes: EmailCodeRepository;
+  /** テスト用 JWT 秘密鍵。省略時は JWT_SECRET */
+  jwtSecret?: string;
 };
 
 function normalizeEmail(email: string): string {
@@ -74,7 +80,7 @@ export class EmailService {
     void code;
   }
 
-  async verifyCode(input: VerifyCodeInput): Promise<void> {
+  async verifyCode(input: VerifyCodeInput): Promise<VerifyCodeResult> {
     const email = normalizeEmail(input.email);
     const purpose = input.purpose;
     const now = new Date();
@@ -104,7 +110,28 @@ export class EmailService {
 
     await this.deps.emailCodes.markUsed(emailCode.id, now);
 
-    // TODO: purpose ごとの副作用
-    throw new NotImplementedError(`email.verify.side_effect.${purpose}`);
+    if (purpose === "unlock") {
+      const userId =
+        emailCode.userId ??
+        (await this.deps.users.findByEmail(email))?.id ??
+        null;
+      if (userId) {
+        await this.deps.users.clearLock(userId);
+      }
+      return { token: null };
+    }
+
+    if (!isEmailActionPurpose(purpose)) {
+      return { token: null };
+    }
+
+    const token = await signEmailActionToken({
+      email,
+      purpose,
+      userId: emailCode.userId,
+      secret: this.deps.jwtSecret,
+    });
+
+    return { token };
   }
 }

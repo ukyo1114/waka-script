@@ -20,4 +20,6 @@ export interface UserRepository {
     id: UserId,
     passwordHash: string,
   ): Promise<UserRecord | null>;
+  /** アカウントロックを解除する（lockedAt を null にする） */
+  clearLock(id: UserId): Promise<UserRecord | null>;
 }
