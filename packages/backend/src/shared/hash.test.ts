@@ -34,7 +34,7 @@ describe("hashSecret / verifySecret", () => {
     assert.ok(Buffer.byteLength(token, "utf8") > 72);
     const hashed = await hashSecret(token);
     assert.equal(await verifySecret(token, hashed), true);
-    assert.equal(await verifySecret(token.slice(0, -1) + "0", hashed), false);
+    assert.equal(await verifySecret(`${token}x`, hashed), false);
   });
 
   it("長いトークンは内部で SHA-256 してから bcrypt している", async () => {

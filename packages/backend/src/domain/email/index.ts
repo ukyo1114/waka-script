@@ -1,19 +1,18 @@
-export {
-  EMAIL_PURPOSES,
-  isEmailPurpose,
-  type EmailPurpose,
-  type IsEmailPurpose,
-} from "./purpose.js";
-export type { EmailToken, EmailTokenId } from "./email-token.js";
+export type {
+  AssertEmailEligibility,
+  AssertTokenSendable,
+  EmailPurpose,
+  EmailToken,
+  EmailTokenId,
+  IsEmailPurpose,
+} from "./types.js";
 export {
   EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
   EMAIL_CODE_TTL_MINUTES,
-} from "./constants.js";
+  EMAIL_PURPOSES,
+} from "./types.js";
 export {
   assertEmailEligibility,
-  type AssertEmailEligibility,
-} from "./eligibility.js";
-export {
   assertTokenSendable,
-  type AssertTokenSendable,
-} from "./token-sendable.js";
+  isEmailPurpose,
+} from "./domain.js";
