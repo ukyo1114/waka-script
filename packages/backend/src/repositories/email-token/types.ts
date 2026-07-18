@@ -2,7 +2,11 @@ import type { UserId } from "../user/types.js";
 
 export type EmailTokenId = string;
 
-export type EmailTokenPurpose = "email_verification" | "password_reset";
+export type EmailTokenPurpose =
+  | "register"
+  | "email-change"
+  | "password-reset"
+  | "unlock";
 
 export type EmailToken = {
   id: EmailTokenId;

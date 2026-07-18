@@ -5,45 +5,52 @@ import {
   readString,
   type JsonBody,
 } from "./http.js";
+import { isEmailPurpose } from "./email-purpose.js";
 
-/** POST /email/verify — メールアドレス認証 */
-export function verify(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const token = readString(body, "token");
-
-  if (!token) return badRequest(res, "token is required");
-
-  return notImplemented(res, "POST /email/verify");
+function readPurpose(req: Request, res: Response) {
+  const purpose = req.params.purpose;
+  if (typeof purpose !== "string" || !isEmailPurpose(purpose)) {
+    badRequest(
+      res,
+      "purpose must be one of: register, email-change, password-reset, unlock",
+    );
+    return null;
+  }
+  return purpose;
 }
 
-/** POST /email/resend — 認証メール再送 */
-export function resend(req: Request, res: Response) {
+/**
+ * POST /email/send/:purpose
+ * メールアドレスへ認証コードを送信する
+ * purpose: register | email-change | password-reset | unlock
+ */
+export function sendCode(req: Request, res: Response) {
+  const purpose = readPurpose(req, res);
+  if (!purpose) return;
+
   const body = (req.body ?? {}) as JsonBody;
   const email = readString(body, "email");
 
   if (!email) return badRequest(res, "email is required");
 
-  return notImplemented(res, "POST /email/resend");
+  return notImplemented(res, `POST /email/send/${purpose}`);
 }
 
-/** POST /email/forgot-password — パスワードリセット要求 */
-export function forgotPassword(req: Request, res: Response) {
+/**
+ * POST /email/verify/:purpose
+ * 認証コードを検証する
+ * purpose: register | email-change | password-reset | unlock
+ */
+export function verifyCode(req: Request, res: Response) {
+  const purpose = readPurpose(req, res);
+  if (!purpose) return;
+
   const body = (req.body ?? {}) as JsonBody;
   const email = readString(body, "email");
+  const code = readString(body, "code");
 
   if (!email) return badRequest(res, "email is required");
+  if (!code) return badRequest(res, "code is required");
 
-  return notImplemented(res, "POST /email/forgot-password");
-}
-
-/** POST /email/reset-password — パスワード再設定 */
-export function resetPassword(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const token = readString(body, "token");
-  const password = readString(body, "password");
-
-  if (!token) return badRequest(res, "token is required");
-  if (!password) return badRequest(res, "password is required");
-
-  return notImplemented(res, "POST /email/reset-password");
+  return notImplemented(res, `POST /email/verify/${purpose}`);
 }
