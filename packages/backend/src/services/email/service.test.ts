@@ -32,6 +32,7 @@ function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
     email: "user@example.com",
     passwordHash: "hash",
     displayName: "User",
+    isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
     createdAt: now,
@@ -413,6 +414,7 @@ describe("EmailService.verifyCode", () => {
   it("password-reset: 検証成功したらトークンに userId を紐づける", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
     const user = createUser();
+    assert.ok(user.email);
     const codeHash = await hashSecret("654321");
     const latest = createEmailCode({
       email: user.email,
@@ -439,6 +441,7 @@ describe("EmailService.verifyCode", () => {
   it("unlock: 検証成功したらロック解除しトークンは返さない", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
     const user = createUser({ lockedAt: new Date() });
+    assert.ok(user.email);
     const codeHash = await hashSecret("111111");
     const latest = createEmailCode({
       email: user.email,

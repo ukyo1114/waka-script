@@ -9,6 +9,7 @@ import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
   changePasswordBodySchema,
+  guestLoginBodySchema,
   loginBodySchema,
   refreshTokenBodySchema,
   registerBodySchema,
@@ -35,6 +36,7 @@ export async function register(req: Request, res: Response) {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isGuest,
     });
   } catch (error) {
     return handleControllerError(res, error);
@@ -52,6 +54,27 @@ export async function login(req: Request, res: Response) {
       id: result.user.id,
       email: result.user.email,
       displayName: result.user.displayName,
+      isGuest: result.user.isGuest,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** POST /user/guest — ゲストとして作成しトークンを発行 */
+export async function loginAsGuest(req: Request, res: Response) {
+  const parsed = parseWithSchema(guestLoginBodySchema, req.body ?? {}, res);
+  if (!parsed.ok) return;
+
+  try {
+    const result = await createUserService(req).loginAsGuest(parsed.data);
+    return res.status(201).json({
+      id: result.user.id,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      isGuest: result.user.isGuest,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     });
@@ -108,6 +131,7 @@ export async function updateDisplayName(req: Request, res: Response) {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isGuest,
     });
   } catch (error) {
     return handleControllerError(res, error);

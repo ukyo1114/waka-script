@@ -29,6 +29,7 @@ export {
   TokenSendNotAllowedError,
   UserAccountLockedError,
   UserNotFoundError,
+  GuestActionNotAllowedError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";

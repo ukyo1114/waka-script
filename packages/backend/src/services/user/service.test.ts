@@ -18,6 +18,7 @@ import type {
 import { verifyAccessToken } from "../../shared/access-token.js";
 import {
   EmailAlreadyRegisteredError,
+  GuestActionNotAllowedError,
   InvalidCredentialsError,
   InvalidEmailTokenError,
   InvalidRefreshTokenError,
@@ -37,6 +38,7 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     email: "new@example.com",
     passwordHash: "hash",
     displayName: "New User",
+    isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
     createdAt: now,
@@ -83,7 +85,9 @@ class FakeUserRepository implements UserRepository {
 
   seed(user: UserRecord) {
     this.users.set(user.id, user);
-    this.users.set(`email:${user.email}`, user);
+    if (user.email) {
+      this.users.set(`email:${user.email}`, user);
+    }
   }
 
   async create(input: CreateUserInput): Promise<UserRecord> {
@@ -94,6 +98,7 @@ class FakeUserRepository implements UserRepository {
       email: input.email,
       passwordHash: input.passwordHash,
       displayName: input.displayName,
+      isGuest: input.isGuest,
     });
     this.seed(user);
     return user;
@@ -318,6 +323,7 @@ describe("UserService.register", () => {
       email: "new@example.com",
       passwordHash: "x",
       displayName: "既存",
+      isGuest: false,
     });
 
     await assert.rejects(
@@ -581,8 +587,8 @@ describe("UserService.changePassword", () => {
 
     const updated = await users.findById("user-1");
     assert.ok(updated);
-    assert.equal(await verifySecret("new-password", updated.passwordHash), true);
-    assert.equal(await verifySecret("old-password", updated.passwordHash), false);
+    assert.equal(await verifySecret("new-password", updated.passwordHash!), true);
+    assert.equal(await verifySecret("old-password", updated.passwordHash!), false);
     assert.ok(refreshTokens.revoked.length >= 1);
   });
 
@@ -606,5 +612,55 @@ describe("UserService.changePassword", () => {
         }),
       InvalidCredentialsError,
     );
+  });
+
+  it("ゲストはパスワード変更できない", async () => {
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "guest-1",
+        email: null,
+        passwordHash: null,
+        isGuest: true,
+      }),
+    );
+    const { userService } = service({ users });
+
+    await assert.rejects(
+      () =>
+        userService.changePassword({
+          userId: "guest-1",
+          currentPassword: "x",
+          newPassword: "y",
+        }),
+      GuestActionNotAllowedError,
+    );
+  });
+});
+
+describe("UserService.loginAsGuest", () => {
+  it("ゲストを作成してトークンを返す", async () => {
+    const { userService, users, refreshTokens } = service();
+    const result = await userService.loginAsGuest({ displayName: "見学" });
+
+    assert.equal(result.user.isGuest, true);
+    assert.equal(result.user.email, null);
+    assert.equal(result.user.displayName, "見学");
+    assert.ok(result.accessToken);
+    assert.ok(result.refreshToken);
+    assert.equal(users.created[0]?.isGuest, true);
+    assert.equal(users.created[0]?.email, null);
+    assert.equal(refreshTokens.created.length, 1);
+
+    const refreshed = await userService.refreshTokens({
+      refreshToken: result.refreshToken,
+    });
+    assert.ok(refreshed.accessToken);
+  });
+
+  it("displayName 省略時は Guest になる", async () => {
+    const { userService } = service();
+    const result = await userService.loginAsGuest();
+    assert.equal(result.user.displayName, "Guest");
   });
 });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   changePassword,
   login,
+  loginAsGuest,
   logout,
   refresh,
   register,
@@ -13,6 +14,7 @@ const userRouter = Router();
 
 userRouter.post("/register", register);
 userRouter.post("/login", login);
+userRouter.post("/guest", loginAsGuest);
 userRouter.post("/token/refresh", refresh);
 userRouter.post("/logout", logout);
 userRouter.patch("/display-name", requireAccessToken, updateDisplayName);

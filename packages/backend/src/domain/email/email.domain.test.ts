@@ -23,6 +23,7 @@ const createUser = (overrides: Partial<User> = {}): User => {
     id: "user-1",
     email: "user@example.com",
     displayName: "User",
+    isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
     createdAt: now,
@@ -98,6 +99,7 @@ describe("assertEmailEligibility", () => {
 
   it("password-reset: 登録済みならユーザーを返す", () => {
     const user = createUser();
+    assert.ok(user.email);
     assert.equal(
       assertEmailEligibility("password-reset", user.email, user),
       user,
@@ -118,6 +120,7 @@ describe("assertEmailEligibility", () => {
 
   it("unlock: ロック中ならユーザーを返す", () => {
     const user = createUser({ lockedAt: new Date() });
+    assert.ok(user.email);
     assert.equal(assertEmailEligibility("unlock", user.email, user), user);
   });
 

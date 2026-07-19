@@ -1,14 +1,15 @@
 import type { User, UserId } from "../../domain/user/index.js";
 
 export type CreateUserInput = {
-  email: string;
-  passwordHash: string;
+  email: string | null;
+  passwordHash: string | null;
   displayName: string;
+  isGuest: boolean;
 };
 
-/** 永続化用ユーザー（passwordHash を含む） */
+/** 永続化用ユーザー（passwordHash を含む。ゲストは null） */
 export type UserRecord = User & {
-  passwordHash: string;
+  passwordHash: string | null;
 };
 
 export interface UserRepository {

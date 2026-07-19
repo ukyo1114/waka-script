@@ -105,3 +105,14 @@ export class UserNotFoundError extends AppError {
     this.name = "UserNotFoundError";
   }
 }
+
+export class GuestActionNotAllowedError extends AppError {
+  constructor(action: string) {
+    super(
+      403,
+      "guest_action_not_allowed",
+      `guest users cannot perform: ${action}`,
+    );
+    this.name = "GuestActionNotAllowedError";
+  }
+}

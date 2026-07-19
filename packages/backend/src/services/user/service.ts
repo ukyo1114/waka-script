@@ -8,6 +8,7 @@ import type {
 import { signAccessToken } from "../../shared/access-token.js";
 import {
   EmailAlreadyRegisteredError,
+  GuestActionNotAllowedError,
   InvalidCredentialsError,
   NotImplementedError,
   UserAccountLockedError,
@@ -30,6 +31,10 @@ export type RegisterUserInput = {
 export type LoginUserInput = {
   email: string;
   password: string;
+};
+
+export type LoginAsGuestInput = {
+  displayName?: string;
 };
 
 export type AuthTokens = {
@@ -123,6 +128,7 @@ export class UserService {
       email,
       passwordHash,
       displayName,
+      isGuest: false,
     });
 
     const verified =
@@ -138,7 +144,9 @@ export class UserService {
     const email = normalizeEmail(input.email);
     const user = await deps.users.findByEmail(email);
 
-    if (!user) throw new InvalidCredentialsError();
+    if (!user || user.isGuest || user.passwordHash === null) {
+      throw new InvalidCredentialsError();
+    }
     if (user.lockedAt) throw new UserAccountLockedError();
 
     const matched = await verifySecret(input.password, user.passwordHash);
@@ -146,6 +154,26 @@ export class UserService {
 
     const tokens = await this.issueTokens(user.id);
     return { user: toPublicUser(user), ...tokens };
+  }
+
+  /**
+   * ゲストとして新規ユーザーを作成し、access / refresh を発行する。
+   * メール・パスワードは持たない。トークンを失うと同一ゲストには戻れない
+   * （再呼び出しは別ゲストを作る）。保有中は refresh で継続可能。
+   */
+  async loginAsGuest(input: LoginAsGuestInput = {}): Promise<LoginResult> {
+    const deps = this.requireDeps();
+    const displayName = input.displayName?.trim() || "Guest";
+
+    const created = await deps.users.create({
+      email: null,
+      passwordHash: null,
+      displayName,
+      isGuest: true,
+    });
+
+    const tokens = await this.issueTokens(created.id);
+    return { user: toPublicUser(created), ...tokens };
   }
 
   async refreshTokens(input: RefreshTokensInput): Promise<AuthTokens> {
@@ -209,6 +237,9 @@ export class UserService {
     const existing = await deps.users.findById(input.userId);
     if (!existing) throw new UserNotFoundError();
     if (existing.lockedAt) throw new UserAccountLockedError();
+    if (existing.isGuest || existing.passwordHash === null) {
+      throw new GuestActionNotAllowedError("changePassword");
+    }
 
     const matched = await verifySecret(
       input.currentPassword,

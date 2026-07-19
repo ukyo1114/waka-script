@@ -27,7 +27,7 @@
 
 **Body:** `{ "email": string, "password": string }`
 
-**成功:** `200 { id, email, displayName, accessToken, refreshToken }`
+**成功:** `200 { id, email, displayName, isGuest, accessToken, refreshToken }`
 
 | トークン | 形式 | 保存 | 有効期限 |
 |----------|------|------|----------|
@@ -44,6 +44,24 @@
 |------|------------|
 | 認証失敗 | `401 invalid_credentials` |
 | アカウントロック | `403 user_account_locked` |
+
+---
+
+## ゲストログイン
+
+`POST /user/guest`
+
+メール・パスワードなしのゲストユーザーを新規作成し、通常ユーザーと同じ access / refresh を発行する。
+
+**Body:** `{ "displayName"?: string }`（省略時 `"Guest"`）
+
+**成功:** `201 { id, email: null, displayName, isGuest: true, accessToken, refreshToken }`
+
+- 認証情報は持たない（`email` / password なし）
+- 表示名変更・チャンネル入室など、トークンで保護された操作は通常ユーザーと同様
+- パスワード変更は不可（`403 guest_action_not_allowed`）
+- refresh が有効な間は同一ゲストとして継続できる
+- トークンを失ったら同一ゲストには戻れない（再呼び出しは別ゲスト）
 
 ---
 

@@ -24,3 +24,9 @@ export const changePasswordBodySchema = z.object({
   currentPassword: nonEmptyString,
   newPassword: nonEmptyString,
 });
+
+export const guestLoginBodySchema = z
+  .object({
+    displayName: nonEmptyString.optional(),
+  })
+  .default({});
