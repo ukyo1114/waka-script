@@ -3,6 +3,7 @@ import type { EventBus } from "../events/index.js";
 import { entryUpdatedEvent } from "../events/index.js";
 import type { Repositories } from "../repositories/index.js";
 import { EntryService } from "../services/entry/index.js";
+import { startGameFromEntries } from "../services/game/index.js";
 import type { SocketChannelContext } from "./socket.types.js";
 
 export type EntryHandlersDeps = {
@@ -10,11 +11,21 @@ export type EntryHandlersDeps = {
   eventBus: EventBus;
 };
 
-function createEntryService(repos: Repositories): EntryService {
+function createEntryService(repos: Repositories, eventBus: EventBus): EntryService {
   return new EntryService({
     channels: repos.channels,
     channelParticipants: repos.channelParticipants,
     channelEntries: repos.channelEntries,
+    onGameStart: (input) =>
+      startGameFromEntries(input, {
+        channels: repos.channels,
+        channelParticipants: repos.channelParticipants,
+        avatars: repos.avatars,
+        games: repos.games,
+        players: repos.players,
+        messages: repos.messages,
+        eventBus,
+      }),
   });
 }
 
@@ -27,7 +38,7 @@ async function emitEntryUpdated(
 }
 
 /**
- * entry:register / entry:cancel / disconnect(自動 cancel)
+ * entry:register / entry:cancel / disconnect(?? cancel)
  */
 export function registerEntryHandlers(
   _io: Server,
@@ -43,7 +54,7 @@ export function registerEntryHandlers(
       if (!context.userId || !context.channelId || !context.participantId) {
         throw new Error("socket_context_missing");
       }
-      const result = await createEntryService(repos).register({
+      const result = await createEntryService(repos, deps.eventBus).register({
         channelId: context.channelId,
         participantId: context.participantId,
         userId: context.userId,
@@ -70,7 +81,7 @@ export function registerEntryHandlers(
       if (!context.userId || !context.channelId || !context.participantId) {
         throw new Error("socket_context_missing");
       }
-      const result = await createEntryService(repos).cancel({
+      const result = await createEntryService(repos, deps.eventBus).cancel({
         channelId: context.channelId,
         participantId: context.participantId,
         userId: context.userId,
@@ -97,7 +108,7 @@ export function registerEntryHandlers(
       if (!context.userId || !context.channelId || !context.participantId) {
         return;
       }
-      const result = await createEntryService(repos).cancel({
+      const result = await createEntryService(repos, deps.eventBus).cancel({
         channelId: context.channelId,
         participantId: context.participantId,
         userId: context.userId,
@@ -108,7 +119,7 @@ export function registerEntryHandlers(
         result.participantIds,
       );
     } catch {
-      // disconnect 時はクライアントへ返さない
+      // disconnect ?????????????
     }
   });
 }

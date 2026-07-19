@@ -1,9 +1,9 @@
 import type { Server, Socket } from "socket.io";
 import type { EventBus } from "../events/index.js";
 import type { Repositories } from "../repositories/index.js";
-import { resolveSocketChannelAuth } from "./socket.auth.js";
+import { resolveSocketContext } from "./socket.auth.js";
 import { registerEntryHandlers } from "./socket.entry.js";
-import type { SocketChannelContext } from "./socket.types.js";
+import type { SocketChannelContext, SocketGameContext } from "./socket.types.js";
 
 export type SocketAuthMiddlewareDeps = {
   getRepos: () => Repositories | undefined;
@@ -25,16 +25,23 @@ export function createSocketAuthMiddleware(deps: SocketAuthMiddlewareDeps) {
         return;
       }
 
-      const context = await resolveSocketChannelAuth({
+      const context = await resolveSocketContext({
         auth: socket.handshake.auth,
         channels: repos.channels,
         channelParticipants: repos.channelParticipants,
+        games: repos.games,
+        players: repos.players,
         jwtSecret: deps.jwtSecret,
       });
 
       socket.data.userId = context.userId;
-      socket.data.channelId = context.channelId;
-      socket.data.participantId = context.participantId;
+      if ("channelId" in context) {
+        socket.data.channelId = context.channelId;
+        socket.data.participantId = context.participantId;
+      } else {
+        socket.data.gameId = context.gameId;
+        socket.data.playerId = context.playerId;
+      }
       next();
     } catch (error) {
       const message =
@@ -44,16 +51,16 @@ export function createSocketAuthMiddleware(deps: SocketAuthMiddlewareDeps) {
   };
 }
 
-/** 接続後: チャンネルルームへ join + エントリーハンドラ */
+/** 接続後: チャンネル／ゲームルームへ join + イベントハンドラ登録 */
 export function registerSocketConnectionHandlers(
   io: Server,
   deps: SocketConnectionHandlerDeps,
 ): void {
   io.on("connection", (socket: Socket) => {
-    const { channelId, userId, participantId } =
-      socket.data as SocketChannelContext;
+    const { userId, channelId, participantId, gameId, playerId } =
+      socket.data as Partial<SocketChannelContext & SocketGameContext>;
 
-    if (!channelId || !userId || !participantId) {
+    if (!userId || (!channelId && !gameId)) {
       socket.emit("error", {
         code: "socket_context_missing",
         message: "socket context is incomplete",
@@ -62,16 +69,19 @@ export function registerSocketConnectionHandlers(
       return;
     }
 
-    socket.join(channelId);
-    socket.emit("socket:ready", {
-      channelId,
-      participantId,
-      userId,
-    });
+    if (channelId && participantId) {
+      socket.join(channelId);
+      socket.emit("socket:ready", { channelId, participantId, userId });
+      registerEntryHandlers(io, socket, {
+        getRepos: deps.getRepos,
+        eventBus: deps.eventBus,
+      });
+      return;
+    }
 
-    registerEntryHandlers(io, socket, {
-      getRepos: deps.getRepos,
-      eventBus: deps.eventBus,
-    });
+    if (gameId && playerId) {
+      socket.join(gameId);
+      socket.emit("socket:ready", { gameId, playerId, userId });
+    }
   });
 }
