@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { DEFAULT_AVATAR_IMAGE_URL, type Avatar } from "../../domain/avatar/index.js";
+import type {
+  AvatarRepository,
+  CreateAvatarInput,
+} from "../../repositories/avatar/index.js";
 import type {
   CreateEmailTokenInput,
   EmailToken,
@@ -247,22 +252,58 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
   }
 }
 
+class FakeAvatarRepository implements AvatarRepository {
+  items: Avatar[] = [];
+  private seq = 0;
+
+  async create(input: CreateAvatarInput): Promise<Avatar> {
+    this.seq += 1;
+    const now = new Date();
+    const avatar: Avatar = {
+      id: `avatar-${this.seq}`,
+      userId: input.userId,
+      name: input.name,
+      imageUrl: input.imageUrl,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.items.push(avatar);
+    return avatar;
+  }
+
+  async findById(id: string): Promise<Avatar | null> {
+    return this.items.find((a) => a.id === id) ?? null;
+  }
+
+  async listByUserId(userId: string): Promise<Avatar[]> {
+    return this.items.filter((a) => a.userId === userId);
+  }
+
+  async countByUserId(userId: string): Promise<number> {
+    return this.items.filter((a) => a.userId === userId).length;
+  }
+}
+
 function service(deps?: {
   users?: FakeUserRepository;
   emailTokens?: FakeEmailTokenRepository;
   refreshTokens?: FakeRefreshTokenRepository;
+  avatars?: FakeAvatarRepository;
 }) {
   const users = deps?.users ?? new FakeUserRepository();
   const emailTokens = deps?.emailTokens ?? new FakeEmailTokenRepository();
   const refreshTokens = deps?.refreshTokens ?? new FakeRefreshTokenRepository();
+  const avatars = deps?.avatars ?? new FakeAvatarRepository();
   return {
     users,
     emailTokens,
     refreshTokens,
+    avatars,
     userService: new UserService({
       users,
       emailTokens,
       refreshTokens,
+      avatars,
       jwtSecret: JWT_SECRET,
     }),
   };
@@ -286,7 +327,7 @@ async function seedRegisterToken(
 
 describe("UserService.register", () => {
   it("有効なトークンならユーザーを作成する", async () => {
-    const { userService, users, emailTokens } = service();
+    const { userService, users, emailTokens, avatars } = service();
     const token = await seedRegisterToken(emailTokens);
 
     const user = await userService.register({
@@ -301,6 +342,9 @@ describe("UserService.register", () => {
     assert.equal(users.created.length, 1);
     assert.equal(emailTokens.markUsedIds[0], "token-reg-1");
     assert.equal("passwordHash" in user, false);
+    assert.equal(avatars.items.length, 1);
+    assert.equal(avatars.items[0]?.name, "太郎");
+    assert.equal(avatars.items[0]?.imageUrl, DEFAULT_AVATAR_IMAGE_URL);
   });
 
   it("不正なトークンなら拒否する", async () => {
@@ -640,7 +684,7 @@ describe("UserService.changePassword", () => {
 
 describe("UserService.loginAsGuest", () => {
   it("ゲストを作成してトークンを返す", async () => {
-    const { userService, users, refreshTokens } = service();
+    const { userService, users, refreshTokens, avatars } = service();
     const result = await userService.loginAsGuest({ displayName: "見学" });
 
     assert.equal(result.user.isGuest, true);
@@ -651,6 +695,8 @@ describe("UserService.loginAsGuest", () => {
     assert.equal(users.created[0]?.isGuest, true);
     assert.equal(users.created[0]?.email, null);
     assert.equal(refreshTokens.created.length, 1);
+    assert.equal(avatars.items.length, 1);
+    assert.equal(avatars.items[0]?.name, "見学");
 
     const refreshed = await userService.refreshTokens({
       refreshToken: result.refreshToken,

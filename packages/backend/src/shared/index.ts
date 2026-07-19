@@ -30,6 +30,7 @@ export {
   UserAccountLockedError,
   UserNotFoundError,
   GuestActionNotAllowedError,
+  AvatarLimitExceededError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";

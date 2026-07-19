@@ -1,5 +1,6 @@
 import type { EmailCodeRepository } from "./email-code/index.js";
 import type { EmailTokenRepository } from "./email-token/index.js";
+import type { AvatarRepository } from "./avatar/index.js";
 import type { RefreshTokenRepository } from "./refresh-token/index.js";
 import type { UserRepository } from "./user/index.js";
 
@@ -8,6 +9,7 @@ export type Repositories = {
   emailCodes: EmailCodeRepository;
   emailTokens: EmailTokenRepository;
   refreshTokens: RefreshTokenRepository;
+  avatars: AvatarRepository;
 };
 
 export type {
@@ -40,5 +42,13 @@ export type {
   RefreshTokenRepository,
 } from "./refresh-token/index.js";
 export { RefreshTokenRepositoryImpl } from "./refresh-token/index.js";
+
+export type {
+  Avatar,
+  AvatarId,
+  AvatarRepository,
+  CreateAvatarInput,
+} from "./avatar/index.js";
+export { AvatarRepositoryImpl } from "./avatar/index.js";
 
 export { getRepositories } from "./get-repositories.js";

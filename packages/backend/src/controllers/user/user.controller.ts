@@ -18,8 +18,8 @@ import {
 
 function createUserService(req: Request): UserService {
   try {
-    const { users, emailTokens, refreshTokens } = getRepositories(req);
-    return new UserService({ users, emailTokens, refreshTokens });
+    const { users, emailTokens, refreshTokens, avatars } = getRepositories(req);
+    return new UserService({ users, emailTokens, refreshTokens, avatars });
   } catch {
     throw new NotImplementedError("user.repositories");
   }

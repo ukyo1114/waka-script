@@ -116,3 +116,14 @@ export class GuestActionNotAllowedError extends AppError {
     this.name = "GuestActionNotAllowedError";
   }
 }
+
+export class AvatarLimitExceededError extends AppError {
+  constructor(limit: number) {
+    super(
+      409,
+      "avatar_limit_exceeded",
+      `avatar limit exceeded (max ${limit})`,
+    );
+    this.name = "AvatarLimitExceededError";
+  }
+}

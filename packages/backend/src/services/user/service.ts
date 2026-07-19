@@ -1,4 +1,5 @@
 import type { User } from "../../domain/user/index.js";
+import type { AvatarRepository } from "../../repositories/avatar/index.js";
 import type { EmailTokenRepository } from "../../repositories/email-token/index.js";
 import type { RefreshTokenRepository } from "../../repositories/refresh-token/index.js";
 import type {
@@ -15,6 +16,7 @@ import {
   UserNotFoundError,
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
+import { AvatarService } from "../avatar/index.js";
 import {
   createRefreshTokenForUser,
   resolveRefreshToken,
@@ -69,6 +71,7 @@ export type UserServiceDeps = {
   users: UserRepository;
   emailTokens: EmailTokenRepository;
   refreshTokens: RefreshTokenRepository;
+  avatars: AvatarRepository;
   /** テスト用。省略時は JWT_SECRET */
   jwtSecret?: string;
 };
@@ -91,6 +94,11 @@ export class UserService {
   private requireDeps(): UserServiceDeps {
     if (!this.deps) throw new NotImplementedError("user.repositories");
     return this.deps;
+  }
+
+  private avatarService(): AvatarService {
+    const deps = this.requireDeps();
+    return new AvatarService({ users: deps.users, avatars: deps.avatars });
   }
 
   private async issueTokens(userId: string): Promise<AuthTokens> {
@@ -135,6 +143,10 @@ export class UserService {
       (await deps.users.markEmailVerified(created.id)) ?? created;
 
     await deps.emailTokens.markUsed(actionToken.id);
+    await this.avatarService().createInitial({
+      userId: verified.id,
+      displayName: verified.displayName,
+    });
 
     return toPublicUser(verified);
   }
@@ -170,6 +182,11 @@ export class UserService {
       passwordHash: null,
       displayName,
       isGuest: true,
+    });
+
+    await this.avatarService().createInitial({
+      userId: created.id,
+      displayName: created.displayName,
     });
 
     const tokens = await this.issueTokens(created.id);

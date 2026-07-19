@@ -16,7 +16,7 @@
 
 1. `POST /email/send/register` `{ email }`
 2. `POST /email/verify/register` `{ email, code }` → `{ token }`
-3. `POST /user/register` `{ token, password, displayName }`
+3. `POST /user/register` `{ token, password, displayName }`（初期アバター自動作成）
 4. `POST /user/login` `{ email, password }` → access / refresh
 
 ---

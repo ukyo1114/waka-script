@@ -1,5 +1,6 @@
 import express from "express";
 import type { Repositories } from "./repositories/index.js";
+import { avatarRouter } from "./routes/avatar.js";
 import { emailRouter } from "./routes/email.js";
 import { userRouter } from "./routes/user.js";
 
@@ -18,6 +19,7 @@ export function createApp(repos?: Repositories) {
 
   app.use("/user", userRouter);
   app.use("/email", emailRouter);
+  app.use("/avatar", avatarRouter);
 
   return app;
 }
