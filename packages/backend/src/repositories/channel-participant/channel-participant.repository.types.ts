@@ -21,5 +21,14 @@ export interface ChannelParticipantRepository {
     channelId: ChannelId,
     userId: UserId,
   ): Promise<ChannelParticipant | null>;
+  findActiveByChannelIdAndAvatarId(
+    channelId: ChannelId,
+    avatarId: AvatarId,
+  ): Promise<ChannelParticipant | null>;
   listActiveChannelIdsByUserId(userId: UserId): Promise<ChannelId[]>;
+  /** チャンネルスコープ付き論理削除（キック） */
+  softDeleteByChannelIdAndAvatarId(
+    channelId: ChannelId,
+    avatarId: AvatarId,
+  ): Promise<ChannelParticipant | null>;
 }

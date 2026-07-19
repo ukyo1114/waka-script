@@ -187,3 +187,42 @@ export class InvalidChannelPasswordError extends AppError {
     this.name = "InvalidChannelPasswordError";
   }
 }
+
+export class ChannelParticipantNotFoundError extends AppError {
+  constructor() {
+    super(404, "channel_participant_not_found", "channel participant not found");
+    this.name = "ChannelParticipantNotFoundError";
+  }
+}
+
+export class ChannelUserBlockedError extends AppError {
+  constructor() {
+    super(403, "channel_user_blocked", "user is blocked from this channel");
+    this.name = "ChannelUserBlockedError";
+  }
+}
+
+export class BlockedUserNotFoundError extends AppError {
+  constructor() {
+    super(404, "blocked_user_not_found", "blocked user not found");
+    this.name = "BlockedUserNotFoundError";
+  }
+}
+
+export class AlreadyBlockedError extends AppError {
+  constructor() {
+    super(409, "already_blocked", "user is already blocked from this channel");
+    this.name = "AlreadyBlockedError";
+  }
+}
+
+export class CannotBlockChannelAdminError extends AppError {
+  constructor() {
+    super(
+      403,
+      "cannot_block_channel_admin",
+      "channel admin cannot be blocked",
+    );
+    this.name = "CannotBlockChannelAdminError";
+  }
+}

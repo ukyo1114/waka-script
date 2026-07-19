@@ -66,3 +66,12 @@ export const joinChannelBodySchema = z.object({
 export const channelIdParamsSchema = z.object({
   id: nonEmptyString,
 });
+
+export const blockChannelUserBodySchema = z.object({
+  avatarId: nonEmptyString,
+});
+
+export const blockedUserParamsSchema = z.object({
+  id: nonEmptyString,
+  blockedUserId: nonEmptyString,
+});

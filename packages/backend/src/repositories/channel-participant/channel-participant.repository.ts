@@ -1,3 +1,4 @@
+import type { AvatarId } from "../../domain/avatar/index.js";
 import type { ChannelId } from "../../domain/channel/index.js";
 import type { UserId } from "../../domain/user/index.js";
 import type {
@@ -27,7 +28,21 @@ export class ChannelParticipantRepositoryImpl
     return notImplemented();
   }
 
+  findActiveByChannelIdAndAvatarId(
+    _channelId: ChannelId,
+    _avatarId: AvatarId,
+  ): Promise<ChannelParticipant | null> {
+    return notImplemented();
+  }
+
   listActiveChannelIdsByUserId(_userId: UserId): Promise<ChannelId[]> {
+    return notImplemented();
+  }
+
+  softDeleteByChannelIdAndAvatarId(
+    _channelId: ChannelId,
+    _avatarId: AvatarId,
+  ): Promise<ChannelParticipant | null> {
     return notImplemented();
   }
 }

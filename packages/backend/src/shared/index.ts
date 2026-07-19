@@ -39,12 +39,18 @@ export {
   ChannelGuestNotAllowedError,
   ChannelPasswordRequiredError,
   InvalidChannelPasswordError,
+  ChannelParticipantNotFoundError,
+  ChannelUserBlockedError,
+  BlockedUserNotFoundError,
+  AlreadyBlockedError,
+  CannotBlockChannelAdminError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";
 export type { ObjectStorage, PutObjectInput } from "./object-storage.js";
 export { ObjectStorageImpl } from "./object-storage.js";
-export { getObjectStorage, getObjectStorageImpl } from "./get-object-storage.js";export {
+export { getObjectStorage, getObjectStorageImpl } from "./get-object-storage.js";
+export {
   badRequest,
   handleControllerError,
   readString,

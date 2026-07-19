@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Avatar } from "../../domain/avatar/index.js";
+import type { BlockedUser } from "../../domain/blocked-user/index.js";
 import type { Channel, ChannelParticipant } from "../../domain/channel/index.js";
 import type {
   AvatarRepository,
   CreateAvatarInput,
 } from "../../repositories/avatar/index.js";
+import type {
+  BlockedUserRepository,
+  CreateBlockedUserInput,
+} from "../../repositories/blocked-user/index.js";
 import type {
   ChannelParticipantRepository,
   CreateChannelParticipantInput,
@@ -20,7 +25,10 @@ import type {
   UserRepository,
 } from "../../repositories/user/index.js";
 import {
+  AlreadyBlockedError,
+  CannotBlockChannelAdminError,
   ChannelGuestNotAllowedError,
+  ChannelUserBlockedError,
   GuestActionNotAllowedError,
   InvalidChannelPasswordError,
   NotChannelAdminError,
@@ -184,10 +192,105 @@ class FakeChannelParticipantRepository implements ChannelParticipantRepository {
     );
   }
 
+  async findActiveByChannelIdAndAvatarId(
+    channelId: string,
+    avatarId: string,
+  ): Promise<ChannelParticipant | null> {
+    return (
+      this.items.find(
+        (p) =>
+          p.channelId === channelId &&
+          p.avatarId === avatarId &&
+          p.deletedAt === null,
+      ) ?? null
+    );
+  }
+
   async listActiveChannelIdsByUserId(userId: string): Promise<string[]> {
     return this.items
       .filter((p) => p.userId === userId && p.deletedAt === null)
       .map((p) => p.channelId);
+  }
+
+  async softDeleteByChannelIdAndAvatarId(
+    channelId: string,
+    avatarId: string,
+  ): Promise<ChannelParticipant | null> {
+    const participant = await this.findActiveByChannelIdAndAvatarId(
+      channelId,
+      avatarId,
+    );
+    if (!participant) return null;
+    participant.deletedAt = new Date();
+    participant.updatedAt = new Date();
+    return participant;
+  }
+}
+
+class FakeBlockedUserRepository implements BlockedUserRepository {
+  items: BlockedUser[] = [];
+
+  async create(input: CreateBlockedUserInput): Promise<BlockedUser> {
+    const now = new Date();
+    const blocked: BlockedUser = {
+      id: input.id,
+      channelId: input.channelId,
+      userId: input.userId,
+      avatarId: input.avatarId,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.items.push(blocked);
+    return blocked;
+  }
+
+  async findActiveByIdAndChannelId(
+    id: string,
+    channelId: string,
+  ): Promise<BlockedUser | null> {
+    return (
+      this.items.find(
+        (b) => b.id === id && b.channelId === channelId && b.deletedAt === null,
+      ) ?? null
+    );
+  }
+
+  async findActiveByChannelIdAndUserId(
+    channelId: string,
+    userId: string,
+  ): Promise<BlockedUser | null> {
+    return (
+      this.items.find(
+        (b) =>
+          b.channelId === channelId &&
+          b.userId === userId &&
+          b.deletedAt === null,
+      ) ?? null
+    );
+  }
+
+  async listActiveByChannelId(channelId: string): Promise<BlockedUser[]> {
+    return this.items.filter(
+      (b) => b.channelId === channelId && b.deletedAt === null,
+    );
+  }
+
+  async listActiveChannelIdsByUserId(userId: string): Promise<string[]> {
+    return this.items
+      .filter((b) => b.userId === userId && b.deletedAt === null)
+      .map((b) => b.channelId);
+  }
+
+  async softDeleteByIdAndChannelId(
+    id: string,
+    channelId: string,
+  ): Promise<BlockedUser | null> {
+    const blocked = await this.findActiveByIdAndChannelId(id, channelId);
+    if (!blocked) return null;
+    blocked.deletedAt = new Date();
+    blocked.updatedAt = new Date();
+    return blocked;
   }
 }
 
@@ -195,6 +298,7 @@ function setup(users: UserRecord[] = [createUserRecord()]) {
   const avatars = new FakeAvatarRepository();
   const channels = new FakeChannelRepository();
   const channelParticipants = new FakeChannelParticipantRepository();
+  const blockedUsers = new FakeBlockedUserRepository();
   const now = new Date();
   for (const user of users) {
     avatars.items.push({
@@ -210,11 +314,13 @@ function setup(users: UserRecord[] = [createUserRecord()]) {
     avatars,
     channels,
     channelParticipants,
+    blockedUsers,
     channelService: new ChannelService({
       users: FakeUserRepository.fromUsers(...users),
       avatars,
       channels,
       channelParticipants,
+      blockedUsers,
     }),
   };
 }
@@ -256,7 +362,7 @@ describe("ChannelService.create", () => {
 });
 
 describe("ChannelService.list", () => {
-  it("一覧と参加中 ID を返す", async () => {
+  it("一覧と参加中・ブロック中 ID を返す", async () => {
     const { channelService } = setup();
     const created = await channelService.create({
       userId: "user-1",
@@ -266,6 +372,7 @@ describe("ChannelService.list", () => {
     const result = await channelService.list({ userId: "user-1" });
     assert.equal(result.channels.length, 1);
     assert.deepEqual(result.participantChannelIds, [created.id]);
+    assert.deepEqual(result.blockedChannelIds, []);
   });
 });
 
@@ -396,6 +503,130 @@ describe("ChannelService.update", () => {
           title: "乗っ取り",
         }),
       NotChannelAdminError,
+    );
+  });
+});
+
+describe("ChannelService.blockUser / unblockUser", () => {
+  it("参加者をキックしてブロックし再入室を拒否する", async () => {
+    const admin = createUserRecord({ id: "user-1" });
+    const target = createUserRecord({ id: "user-2", email: "b@example.com" });
+    const { channelService, channelParticipants, blockedUsers } = setup([
+      admin,
+      target,
+    ]);
+
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "村A",
+    });
+    await channelService.join({
+      userId: "user-2",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+
+    const blocked = await channelService.blockUser({
+      userId: "user-1",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+    assert.equal(blocked.userId, "user-2");
+    assert.equal(blocked.avatarId, "av-user-2");
+    assert.equal(
+      channelParticipants.items.find((p) => p.userId === "user-2")?.deletedAt !=
+        null,
+      true,
+    );
+    assert.equal(blockedUsers.items[0]?.userId, "user-2");
+
+    await assert.rejects(
+      () =>
+        channelService.join({
+          userId: "user-2",
+          channelId: channel.id,
+          avatarId: "av-user-2",
+        }),
+      ChannelUserBlockedError,
+    );
+
+    const listForTarget = await channelService.list({ userId: "user-2" });
+    assert.deepEqual(listForTarget.blockedChannelIds, [channel.id]);
+
+    await channelService.unblockUser({
+      userId: "user-1",
+      channelId: channel.id,
+      blockedUserId: blocked.id,
+    });
+
+    const rejoined = await channelService.join({
+      userId: "user-2",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+    assert.equal(rejoined.userId, "user-2");
+  });
+
+  it("管理者自身はブロックできない", async () => {
+    const { channelService } = setup();
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "村A",
+    });
+    await assert.rejects(
+      () =>
+        channelService.blockUser({
+          userId: "user-1",
+          channelId: channel.id,
+          avatarId: "av-user-1",
+        }),
+      CannotBlockChannelAdminError,
+    );
+  });
+
+  it("二重ブロックは拒否する", async () => {
+    const admin = createUserRecord({ id: "user-1" });
+    const target = createUserRecord({ id: "user-2", email: "b@example.com" });
+    const { channelService, channelParticipants } = setup([admin, target]);
+
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "村A",
+    });
+    await channelService.join({
+      userId: "user-2",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+    await channelService.blockUser({
+      userId: "user-1",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+
+    // ブロック済みのまま参加者が残っている状態を再現
+    const now = new Date();
+    channelParticipants.items.push({
+      id: "readded",
+      channelId: channel.id,
+      userId: "user-2",
+      avatarId: "av-user-2",
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    });
+
+    await assert.rejects(
+      () =>
+        channelService.blockUser({
+          userId: "user-1",
+          channelId: channel.id,
+          avatarId: "av-user-2",
+        }),
+      AlreadyBlockedError,
     );
   });
 });

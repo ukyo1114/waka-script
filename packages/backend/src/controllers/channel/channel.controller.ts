@@ -8,6 +8,8 @@ import {
 import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
+  blockChannelUserBodySchema,
+  blockedUserParamsSchema,
   channelIdParamsSchema,
   createChannelBodySchema,
   joinChannelBodySchema,
@@ -16,13 +18,14 @@ import {
 
 function createChannelService(req: Request): ChannelService {
   try {
-    const { users, avatars, channels, channelParticipants } =
+    const { users, avatars, channels, channelParticipants, blockedUsers } =
       getRepositories(req);
     return new ChannelService({
       users,
       avatars,
       channels,
       channelParticipants,
+      blockedUsers,
     });
   } catch {
     throw new NotImplementedError("channel.repositories");
@@ -124,6 +127,68 @@ export async function updateChannel(req: Request, res: Response) {
       gameSettings: parsed.data.gameSettings,
     });
     return res.status(200).json(channel);
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** GET /channel/:id/blocked-users — ブロック一覧（管理者） */
+export async function listBlockedUsers(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(channelIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    const blockedUsers = await createChannelService(req).listBlockedUsers({
+      userId,
+      channelId: params.data.id,
+    });
+    return res.status(200).json({ blockedUsers });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** POST /channel/:id/blocked-users — ブロック（管理者） */
+export async function blockChannelUser(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(channelIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  const parsed = parseWithSchema(blockChannelUserBodySchema, req.body, res);
+  if (!parsed.ok) return;
+
+  try {
+    const blockedUser = await createChannelService(req).blockUser({
+      userId,
+      channelId: params.data.id,
+      avatarId: parsed.data.avatarId,
+    });
+    return res.status(201).json(blockedUser);
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** DELETE /channel/:id/blocked-users/:blockedUserId — 解除（管理者） */
+export async function unblockChannelUser(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(blockedUserParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    await createChannelService(req).unblockUser({
+      userId,
+      channelId: params.data.id,
+      blockedUserId: params.data.blockedUserId,
+    });
+    return res.status(200).json({ ok: true });
   } catch (error) {
     return handleControllerError(res, error);
   }

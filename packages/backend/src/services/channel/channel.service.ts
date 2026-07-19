@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { assertAvatarOwnedByUser } from "../../domain/avatar/index.js";
 import {
-  assertAvatarOwnedByUser,
-} from "../../domain/avatar/index.js";
+  assertCannotBlockChannelAdmin,
+  assertNotAlreadyBlocked,
+  assertNotBlockedFromChannel,
+  type BlockedUser,
+} from "../../domain/blocked-user/index.js";
 import {
   assertChannelAdmin,
   assertGuestCanCreateChannel,
@@ -20,11 +24,14 @@ import {
   type SettingsInput,
 } from "../../domain/channel/index.js";
 import type { AvatarRepository } from "../../repositories/avatar/index.js";
+import type { BlockedUserRepository } from "../../repositories/blocked-user/index.js";
 import type { ChannelParticipantRepository } from "../../repositories/channel-participant/index.js";
 import type { ChannelRepository } from "../../repositories/channel/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
 import {
   AvatarNotFoundError,
+  BlockedUserNotFoundError,
+  ChannelParticipantNotFoundError,
   InvalidChannelPasswordError,
   NotImplementedError,
   UserAccountLockedError,
@@ -48,6 +55,7 @@ export type ListChannelsInput = {
 export type ListChannelsResult = {
   channels: PublicChannel[];
   participantChannelIds: string[];
+  blockedChannelIds: string[];
 };
 
 export type JoinChannelInput = {
@@ -66,6 +74,32 @@ export type UpdateChannelInput = {
   gameSettings?: GameSettingsInput;
 };
 
+export type BlockChannelUserInput = {
+  userId: string;
+  channelId: string;
+  /** ブロック対象のアバター（参加中であること） */
+  avatarId: string;
+};
+
+export type UnblockChannelUserInput = {
+  userId: string;
+  channelId: string;
+  blockedUserId: string;
+};
+
+export type ListBlockedUsersInput = {
+  userId: string;
+  channelId: string;
+};
+
+export type PublicBlockedUser = {
+  id: string;
+  channelId: string;
+  userId: string;
+  avatarId: string;
+  createdAt: Date;
+};
+
 export type PublicChannel = {
   id: string;
   adminId: string;
@@ -82,11 +116,11 @@ export type ChannelServiceDeps = {
   avatars: AvatarRepository;
   channels: ChannelRepository;
   channelParticipants: ChannelParticipantRepository;
+  blockedUsers: BlockedUserRepository;
 };
 
 /**
- * チャンネル作成・一覧・入室・情報変更を担う。
- * ブロック・退出・削除は別途。
+ * チャンネル作成・一覧・入室・情報変更・ブロックを担う。
  */
 export class ChannelService {
   constructor(private readonly deps?: ChannelServiceDeps) {}
@@ -110,6 +144,14 @@ export class ChannelService {
     return avatar;
   }
 
+  private async requireAdminChannel(userId: string, channelId: string) {
+    const channel = ensureChannelExists(
+      await this.requireDeps().channels.findById(channelId),
+    );
+    assertChannelAdmin(channel.adminUserId, userId);
+    return channel;
+  }
+
   private toPublic(channel: Channel): PublicChannel {
     return {
       id: channel.id,
@@ -120,6 +162,16 @@ export class ChannelService {
       gameSettings: channel.gameSettings,
       createdAt: channel.createdAt,
       updatedAt: channel.updatedAt,
+    };
+  }
+
+  private toPublicBlocked(blocked: BlockedUser): PublicBlockedUser {
+    return {
+      id: blocked.id,
+      channelId: blocked.channelId,
+      userId: blocked.userId,
+      avatarId: blocked.avatarId,
+      createdAt: blocked.createdAt,
     };
   }
 
@@ -162,14 +214,17 @@ export class ChannelService {
     const deps = this.requireDeps();
     await this.requireActiveUser(input.userId);
 
-    const [channels, participantChannelIds] = await Promise.all([
-      deps.channels.listActive(),
-      deps.channelParticipants.listActiveChannelIdsByUserId(input.userId),
-    ]);
+    const [channels, participantChannelIds, blockedChannelIds] =
+      await Promise.all([
+        deps.channels.listActive(),
+        deps.channelParticipants.listActiveChannelIdsByUserId(input.userId),
+        deps.blockedUsers.listActiveChannelIdsByUserId(input.userId),
+      ]);
 
     return {
       channels: channels.map((c) => this.toPublic(c)),
       participantChannelIds,
+      blockedChannelIds,
     };
   }
 
@@ -188,6 +243,12 @@ export class ChannelService {
       );
       if (!ok) throw new InvalidChannelPasswordError();
     }
+
+    const blocked = await deps.blockedUsers.findActiveByChannelIdAndUserId(
+      channel.id,
+      input.userId,
+    );
+    assertNotBlockedFromChannel(blocked);
 
     const existing =
       await deps.channelParticipants.findActiveByChannelIdAndUserId(
@@ -234,5 +295,73 @@ export class ChannelService {
     });
 
     return this.toPublic(ensureChannelExists(updated));
+  }
+
+  /** 管理者: 参加者をキックしチャンネル単位でブロック */
+  async blockUser(input: BlockChannelUserInput): Promise<PublicBlockedUser> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+    const channel = await this.requireAdminChannel(
+      input.userId,
+      input.channelId,
+    );
+
+    const participant =
+      await deps.channelParticipants.findActiveByChannelIdAndAvatarId(
+        channel.id,
+        input.avatarId,
+      );
+    if (!participant) throw new ChannelParticipantNotFoundError();
+
+    assertCannotBlockChannelAdmin(channel.adminUserId, participant.userId);
+
+    const existing = await deps.blockedUsers.findActiveByChannelIdAndUserId(
+      channel.id,
+      participant.userId,
+    );
+    assertNotAlreadyBlocked(existing);
+
+    const removed =
+      await deps.channelParticipants.softDeleteByChannelIdAndAvatarId(
+        channel.id,
+        input.avatarId,
+      );
+    if (!removed) throw new ChannelParticipantNotFoundError();
+
+    const blocked = await deps.blockedUsers.create({
+      id: randomUUID(),
+      channelId: channel.id,
+      userId: participant.userId,
+      avatarId: participant.avatarId,
+    });
+
+    return this.toPublicBlocked(blocked);
+  }
+
+  async unblockUser(input: UnblockChannelUserInput): Promise<void> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+    await this.requireAdminChannel(input.userId, input.channelId);
+
+    const deleted = await deps.blockedUsers.softDeleteByIdAndChannelId(
+      input.blockedUserId,
+      input.channelId,
+    );
+    if (!deleted) {
+      throw new BlockedUserNotFoundError();
+    }
+  }
+
+  async listBlockedUsers(
+    input: ListBlockedUsersInput,
+  ): Promise<PublicBlockedUser[]> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+    await this.requireAdminChannel(input.userId, input.channelId);
+
+    const items = await deps.blockedUsers.listActiveByChannelId(
+      input.channelId,
+    );
+    return items.map((b) => this.toPublicBlocked(b));
   }
 }
