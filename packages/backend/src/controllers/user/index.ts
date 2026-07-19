@@ -1,1 +1,1 @@
-export { login, logout, me, register } from "./controller.js";
+export { login, logout, register } from "./controller.js";

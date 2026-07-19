@@ -87,10 +87,4 @@ export class UserService {
     // TODO: セッション破棄
     throw new NotImplementedError("user.logout");
   }
-
-  async getMe(): Promise<User> {
-    void this.deps;
-    // TODO: 認証済みユーザー取得
-    throw new NotImplementedError("user.me");
-  }
 }

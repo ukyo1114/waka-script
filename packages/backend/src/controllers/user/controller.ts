@@ -75,17 +75,3 @@ export async function logout(req: Request, res: Response) {
     return handleControllerError(res, error);
   }
 }
-
-/** GET /user/me */
-export async function me(req: Request, res: Response) {
-  try {
-    const user = await createUserService(req).getMe();
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}

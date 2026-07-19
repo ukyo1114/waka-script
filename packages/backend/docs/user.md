@@ -51,4 +51,3 @@ sequenceDiagram
 |----------|------|------|
 | POST | `/user/login` | 501 |
 | POST | `/user/logout` | 501 |
-| GET | `/user/me` | 501 |
