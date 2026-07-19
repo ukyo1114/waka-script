@@ -17,4 +17,5 @@ export interface AvatarRepository {
   listByUserId(userId: UserId): Promise<Avatar[]>;
   countByUserId(userId: UserId): Promise<number>;
   updateName(id: AvatarId, name: string): Promise<Avatar | null>;
+  delete(id: AvatarId): Promise<boolean>;
 }

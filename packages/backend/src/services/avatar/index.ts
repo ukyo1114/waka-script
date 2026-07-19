@@ -4,6 +4,7 @@ export {
   type AvatarServiceDeps,
   type CreateAvatarInput,
   type CreateInitialAvatarInput,
+  type DeleteAvatarInput,
   type ListAvatarsInput,
   type UpdateAvatarImageInput,
   type UpdateAvatarNameInput,

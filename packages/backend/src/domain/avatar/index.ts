@@ -1,5 +1,6 @@
 export type {
   AssertAvatarCreatable,
+  AssertAvatarDeletable,
   AssertAvatarOwnedByUser,
   Avatar,
   AvatarId,
@@ -12,6 +13,7 @@ export {
 } from "./avatar.types.js";
 export {
   assertAvatarCreatable,
+  assertAvatarDeletable,
   assertAvatarOwnedByUser,
   buildAvatarImageUrl,
   buildAvatarObjectKey,

@@ -31,4 +31,8 @@ export class AvatarRepositoryImpl implements AvatarRepository {
   updateName(_id: AvatarId, _name: string): Promise<Avatar | null> {
     return notImplemented();
   }
+
+  delete(_id: AvatarId): Promise<boolean> {
+    return notImplemented();
+  }
 }

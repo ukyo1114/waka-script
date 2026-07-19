@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createAvatar,
+  deleteAvatar,
   listAvatars,
   updateAvatarImage,
   updateAvatarName,
@@ -19,5 +20,6 @@ avatarRouter.put(
   avatarImageUpload,
   updateAvatarImage,
 );
+avatarRouter.delete("/:id", requireAccessToken, deleteAvatar);
 
 export { avatarRouter };

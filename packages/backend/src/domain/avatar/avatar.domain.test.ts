@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assertAvatarCreatable,
+  assertAvatarDeletable,
   assertAvatarOwnedByUser,
   AVATAR_LIMIT_GUEST,
   AVATAR_LIMIT_REGISTERED,
@@ -12,6 +13,7 @@ import {
 import {
   AvatarAccessDeniedError,
   AvatarLimitExceededError,
+  AvatarMinimumRequiredError,
 } from "../../shared/errors.js";
 
 describe("getAvatarLimit", () => {
@@ -47,6 +49,17 @@ describe("assertAvatarOwnedByUser", () => {
       () => assertAvatarOwnedByUser("u1", "u2"),
       AvatarAccessDeniedError,
     );
+  });
+});
+
+describe("assertAvatarDeletable", () => {
+  it("2件以上なら通す", () => {
+    assert.doesNotThrow(() => assertAvatarDeletable(2));
+  });
+
+  it("1件以下なら拒否する", () => {
+    assert.throws(() => assertAvatarDeletable(1), AvatarMinimumRequiredError);
+    assert.throws(() => assertAvatarDeletable(0), AvatarMinimumRequiredError);
   });
 });
 

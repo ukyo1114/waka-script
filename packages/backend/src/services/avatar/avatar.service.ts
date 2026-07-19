@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   assertAvatarCreatable,
+  assertAvatarDeletable,
   assertAvatarOwnedByUser,
   buildAvatarImageUrl,
   buildAvatarObjectKey,
@@ -51,6 +52,11 @@ export type UpdateAvatarImageInput = {
   avatarId: string;
   body: Buffer;
   contentType: string;
+};
+
+export type DeleteAvatarInput = {
+  userId: string;
+  avatarId: string;
 };
 
 export type AvatarServiceDeps = {
@@ -168,5 +174,25 @@ export class AvatarService {
     });
 
     return avatar;
+  }
+
+  /**
+   * 所有アバターを削除する。最低1件は残す。
+   * オブジェクトストレージがある場合は対応キーも削除する。
+   */
+  async delete(input: DeleteAvatarInput): Promise<void> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+    await this.requireOwnedAvatar(input.userId, input.avatarId);
+
+    const count = await deps.avatars.countByUserId(input.userId);
+    assertAvatarDeletable(count);
+
+    const deleted = await deps.avatars.delete(input.avatarId);
+    if (!deleted) throw new AvatarNotFoundError();
+
+    if (deps.objectStorage) {
+      await deps.objectStorage.deleteObject(buildAvatarObjectKey(input.avatarId));
+    }
   }
 }

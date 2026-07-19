@@ -1,5 +1,6 @@
 export {
   createAvatar,
+  deleteAvatar,
   listAvatars,
   updateAvatarImage,
   updateAvatarName,

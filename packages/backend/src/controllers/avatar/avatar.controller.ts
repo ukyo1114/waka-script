@@ -138,3 +138,22 @@ export async function updateAvatarImage(req: Request, res: Response) {
     return handleControllerError(res, error);
   }
 }
+
+/** DELETE /avatar/:id — アバター削除（要 access token、最低1件残す） */
+export async function deleteAvatar(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(avatarIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    await createAvatarService(req).delete({
+      userId,
+      avatarId: params.data.id,
+    });
+    return res.status(204).send();
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}

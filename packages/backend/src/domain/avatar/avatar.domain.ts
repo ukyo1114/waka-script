@@ -1,6 +1,7 @@
 import {
   AvatarAccessDeniedError,
   AvatarLimitExceededError,
+  AvatarMinimumRequiredError,
 } from "../../shared/errors.js";
 import type { UserId } from "../user/index.js";
 import {
@@ -8,6 +9,7 @@ import {
   AVATAR_LIMIT_REGISTERED,
   DEFAULT_AVATAR_IMAGE_PUBLIC_BASE_URL,
   type AssertAvatarCreatable,
+  type AssertAvatarDeletable,
   type AssertAvatarOwnedByUser,
   type GetAvatarLimit,
 } from "./avatar.types.js";
@@ -36,6 +38,13 @@ export const assertAvatarOwnedByUser: AssertAvatarOwnedByUser = (
 ) => {
   if (avatarUserId !== requesterUserId) {
     throw new AvatarAccessDeniedError();
+  }
+};
+
+/** 最低1件は残す（初期アバター含む） */
+export const assertAvatarDeletable: AssertAvatarDeletable = (currentCount) => {
+  if (currentCount <= 1) {
+    throw new AvatarMinimumRequiredError();
   }
 };
 

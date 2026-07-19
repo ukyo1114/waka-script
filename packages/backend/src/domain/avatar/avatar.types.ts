@@ -37,3 +37,5 @@ export type AssertAvatarOwnedByUser = (
   avatarUserId: UserId,
   requesterUserId: UserId,
 ) => void;
+
+export type AssertAvatarDeletable = (currentCount: number) => void;

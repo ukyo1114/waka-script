@@ -75,3 +75,21 @@
 | ファイルなし・不正形式・サイズ超過 | `400 invalid_avatar_image` |
 | アバター不存在 | `404 avatar_not_found` |
 | 他人のアバター | `403 avatar_access_denied` |
+
+## 削除
+
+`DELETE /avatar/:id`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+所有アバターを削除する。**最低1件は残す**（初期アバター含む）。オブジェクトストレージがあれば対応キーも削除する。
+
+**成功:** `204`
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| 最後の1件 | `409 avatar_minimum_required` |
+| アバター不存在 | `404 avatar_not_found` |
+| 他人のアバター | `403 avatar_access_denied` |

@@ -15,6 +15,7 @@ import type {
 import {
   AvatarAccessDeniedError,
   AvatarLimitExceededError,
+  AvatarMinimumRequiredError,
   AvatarNotFoundError,
   InvalidAvatarImageError,
   UserNotFoundError,
@@ -30,10 +31,12 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     id: "user-1",
     email: "user@example.com",
     passwordHash: "hash",
-    displayName: "太郎",
+    displayName: "??",
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -61,7 +64,19 @@ class FakeUserRepository implements UserRepository {
   async updateDisplayName(): Promise<UserRecord | null> {
     return this.user;
   }
+  async updateEmail(): Promise<UserRecord | null> {
+    return this.user;
+  }
   async clearLock(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async recordFailedLogin(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async resetLoginAttempts(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async softDelete(): Promise<UserRecord | null> {
     return this.user;
   }
 }
@@ -102,13 +117,25 @@ class FakeAvatarRepository implements AvatarRepository {
     avatar.updatedAt = new Date();
     return avatar;
   }
+
+  async delete(id: string): Promise<boolean> {
+    const index = this.items.findIndex((a) => a.id === id);
+    if (index < 0) return false;
+    this.items.splice(index, 1);
+    return true;
+  }
 }
 
 class FakeObjectStorage implements ObjectStorage {
   puts: PutObjectInput[] = [];
+  deletedKeys: string[] = [];
 
   async putObject(input: PutObjectInput): Promise<void> {
     this.puts.push(input);
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    this.deletedKeys.push(key);
   }
 }
 
@@ -128,19 +155,19 @@ function service(user: UserRecord | null) {
 }
 
 describe("AvatarService.create", () => {
-  it("アバターを作成できる（imageUrl は id から生成）", async () => {
+  it("???????????imageUrl ? id ?????", async () => {
     const { avatarService, avatars } = service(createUserRecord());
     const avatar = await avatarService.create({
       userId: "user-1",
-      name: "人狼",
+      name: "??",
     });
-    assert.equal(avatar.name, "人狼");
+    assert.equal(avatar.name, "??");
     assert.equal(avatar.imageUrl, buildAvatarImageUrl(avatar.id, PUBLIC_BASE));
     assert.equal(avatars.items.length, 1);
     assert.equal(avatars.items[0]?.id, avatar.id);
   });
 
-  it("登録ユーザーは 10 件まで", async () => {
+  it("??????? 10 ???", async () => {
     const { avatarService } = service(createUserRecord());
     for (let i = 0; i < 10; i += 1) {
       await avatarService.create({
@@ -158,7 +185,7 @@ describe("AvatarService.create", () => {
     );
   });
 
-  it("ゲストは 1 件まで", async () => {
+  it("???? 1 ???", async () => {
     const { avatarService } = service(
       createUserRecord({ isGuest: true, email: null, passwordHash: null }),
     );
@@ -176,7 +203,7 @@ describe("AvatarService.create", () => {
     );
   });
 
-  it("ユーザーがいないと拒否する", async () => {
+  it("?????????????", async () => {
     const { avatarService } = service(null);
     await assert.rejects(
       () =>
@@ -190,19 +217,19 @@ describe("AvatarService.create", () => {
 });
 
 describe("AvatarService.createInitial", () => {
-  it("表示名と id 由来の imageUrl で作成する", async () => {
+  it("???? id ??? imageUrl ?????", async () => {
     const { avatarService } = service(createUserRecord());
     const avatar = await avatarService.createInitial({
       userId: "user-1",
-      displayName: "太郎",
+      displayName: "??",
     });
-    assert.equal(avatar.name, "太郎");
+    assert.equal(avatar.name, "??");
     assert.equal(avatar.imageUrl, buildAvatarImageUrl(avatar.id, PUBLIC_BASE));
   });
 });
 
 describe("AvatarService.list", () => {
-  it("自分のアバター一覧を返す", async () => {
+  it("????????????", async () => {
     const { avatarService } = service(createUserRecord());
     await avatarService.create({
       userId: "user-1",
@@ -215,28 +242,28 @@ describe("AvatarService.list", () => {
 });
 
 describe("AvatarService.updateName", () => {
-  it("名前を更新できる", async () => {
+  it("????????", async () => {
     const { avatarService } = service(createUserRecord());
     const created = await avatarService.create({
       userId: "user-1",
-      name: "旧",
+      name: "?",
     });
     const updated = await avatarService.updateName({
       userId: "user-1",
       avatarId: created.id,
-      name: "新",
+      name: "?",
     });
-    assert.equal(updated.name, "新");
+    assert.equal(updated.name, "?");
     assert.equal(updated.imageUrl, created.imageUrl);
   });
 
-  it("他人のアバターは拒否する", async () => {
+  it("????????????", async () => {
     const { avatarService, avatars } = service(createUserRecord());
     const now = new Date();
     avatars.items.push({
       id: "other-avatar",
       userId: "other-user",
-      name: "他",
+      name: "?",
       imageUrl: "https://cdn.test/avatars/other-avatar",
       createdAt: now,
       updatedAt: now,
@@ -246,13 +273,13 @@ describe("AvatarService.updateName", () => {
         avatarService.updateName({
           userId: "user-1",
           avatarId: "other-avatar",
-          name: "奪取",
+          name: "??",
         }),
       AvatarAccessDeniedError,
     );
   });
 
-  it("存在しないと拒否する", async () => {
+  it("??????????", async () => {
     const { avatarService } = service(createUserRecord());
     await assert.rejects(
       () =>
@@ -267,7 +294,7 @@ describe("AvatarService.updateName", () => {
 });
 
 describe("AvatarService.updateImage", () => {
-  it("同一キーへ put し imageUrl は変えない", async () => {
+  it("????? put ? imageUrl ?????", async () => {
     const { avatarService, objectStorage } = service(createUserRecord());
     const created = await avatarService.create({
       userId: "user-1",
@@ -286,7 +313,7 @@ describe("AvatarService.updateImage", () => {
     assert.equal(objectStorage.puts[0]?.contentType, "image/png");
   });
 
-  it("不正な content type は拒否する", async () => {
+  it("??? content type ?????", async () => {
     const { avatarService } = service(createUserRecord());
     const created = await avatarService.create({
       userId: "user-1",
@@ -301,6 +328,41 @@ describe("AvatarService.updateImage", () => {
           contentType: "application/pdf",
         }),
       InvalidAvatarImageError,
+    );
+  });
+});
+
+describe("AvatarService.delete", () => {
+  it("2???????????", async () => {
+    const { avatarService, avatars, objectStorage } = service(
+      createUserRecord(),
+    );
+    const first = await avatarService.create({
+      userId: "user-1",
+      name: "A",
+    });
+    const second = await avatarService.create({
+      userId: "user-1",
+      name: "B",
+    });
+    await avatarService.delete({ userId: "user-1", avatarId: second.id });
+    assert.equal(avatars.items.length, 1);
+    assert.equal(avatars.items[0]?.id, first.id);
+    assert.deepEqual(objectStorage.deletedKeys, [`avatars/${second.id}`]);
+  });
+
+  it("???1????????", async () => {
+    const { avatarService } = service(createUserRecord());
+    const only = await avatarService.create({
+      userId: "user-1",
+      name: "A",
+    });
+    const { AvatarMinimumRequiredError } = await import(
+      "../../shared/errors.js"
+    );
+    await assert.rejects(
+      () => avatarService.delete({ userId: "user-1", avatarId: only.id }),
+      AvatarMinimumRequiredError,
     );
   });
 });
