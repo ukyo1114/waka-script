@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { UserService } from "../../services/user/index.js";
+import { NotImplementedError } from "../../shared/errors.js";
 import {
   badRequest,
   handleControllerError,
@@ -10,27 +11,27 @@ import {
 
 function createUserService(req: Request): UserService {
   try {
-    const { users } = getRepositories(req);
-    return new UserService({ users });
+    const { users, emailTokens } = getRepositories(req);
+    return new UserService({ users, emailTokens });
   } catch {
-    return new UserService();
+    throw new NotImplementedError("user.repositories");
   }
 }
 
-/** POST /user/register */
+/** POST /user/register — メール認証トークン付き本登録 */
 export async function register(req: Request, res: Response) {
   const body = (req.body ?? {}) as JsonBody;
-  const email = readString(body, "email");
+  const token = readString(body, "token");
   const password = readString(body, "password");
   const displayName = readString(body, "displayName");
 
-  if (!email) return badRequest(res, "email is required");
+  if (!token) return badRequest(res, "token is required");
   if (!password) return badRequest(res, "password is required");
   if (!displayName) return badRequest(res, "displayName is required");
 
   try {
     const user = await createUserService(req).register({
-      email,
+      token,
       password,
       displayName,
     });

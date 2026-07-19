@@ -12,3 +12,4 @@ export {
   type VerifyCodeInput,
   type VerifyCodeResult,
 } from "./service.js";
+export { resolveActionToken } from "./resolve-action-token.js";

@@ -5,7 +5,6 @@ import {
   EMAIL_ACTION_TOKEN_TTL_SECONDS,
   EMAIL_CODE_TTL_MINUTES,
   isEmailActionPurpose,
-  type EmailActionPurpose,
   type EmailPurpose,
 } from "../../domain/email/index.js";
 import type { EmailCodeRepository } from "../../repositories/email-code/index.js";
@@ -14,17 +13,19 @@ import type {
   EmailTokenRepository,
 } from "../../repositories/email-token/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
-import {
-  InvalidEmailTokenError,
-  InvalidVerificationCodeError,
-} from "../../shared/errors.js";
+import { InvalidVerificationCodeError } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { createRandomCode } from "../../shared/random-code.js";
 import {
   createRandomToken,
   formatEmailToken,
-  parseEmailToken,
 } from "../../shared/random-token.js";
+import {
+  resolveActionToken,
+  type ResolveActionTokenInput,
+} from "./resolve-action-token.js";
+
+export type { ResolveActionTokenInput } from "./resolve-action-token.js";
 
 export type SendVerificationCodeInput = {
   purpose: EmailPurpose;
@@ -40,12 +41,6 @@ export type VerifyCodeInput = {
 export type VerifyCodeResult = {
   /** register / email-change / password-reset で発行。unlock は null */
   token: string | null;
-};
-
-export type ResolveActionTokenInput = {
-  token: string;
-  /** 指定時は purpose が一致しないと無効 */
-  purpose?: EmailActionPurpose;
 };
 
 export type EmailServiceDeps = {
@@ -168,24 +163,6 @@ export class EmailService {
   async resolveActionToken(
     input: ResolveActionTokenInput,
   ): Promise<EmailToken> {
-    const parsed = parseEmailToken(input.token);
-    if (!parsed) throw new InvalidEmailTokenError();
-
-    const record = await this.deps.emailTokens.findById(parsed.id);
-    const now = new Date();
-
-    if (
-      !record ||
-      record.usedAt !== null ||
-      record.expiresAt <= now ||
-      (input.purpose !== undefined && record.purpose !== input.purpose)
-    ) {
-      throw new InvalidEmailTokenError();
-    }
-
-    const matched = await verifySecret(parsed.secret, record.tokenHash);
-    if (!matched) throw new InvalidEmailTokenError();
-
-    return record;
+    return resolveActionToken(this.deps.emailTokens, input);
   }
 }
