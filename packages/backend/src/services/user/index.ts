@@ -1,6 +1,7 @@
 export {
   UserService,
   type AuthTokens,
+  type ChangePasswordInput,
   type LoginResult,
   type LoginUserInput,
   type LogoutInput,

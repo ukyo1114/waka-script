@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  changePassword,
   login,
   logout,
   refresh,
@@ -15,5 +16,6 @@ userRouter.post("/login", login);
 userRouter.post("/token/refresh", refresh);
 userRouter.post("/logout", logout);
 userRouter.patch("/display-name", requireAccessToken, updateDisplayName);
+userRouter.patch("/password", requireAccessToken, changePassword);
 
 export { userRouter };

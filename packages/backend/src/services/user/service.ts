@@ -54,6 +54,12 @@ export type UpdateDisplayNameInput = {
   displayName: string;
 };
 
+export type ChangePasswordInput = {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type UserServiceDeps = {
   users: UserRepository;
   emailTokens: EmailTokenRepository;
@@ -191,5 +197,32 @@ export class UserService {
     if (!updated) throw new UserNotFoundError();
 
     return toPublicUser(updated);
+  }
+
+  /**
+   * ログイン中ユーザーのパスワードを変更する。
+   * 成功後、既存のリフレッシュトークンはすべて失効させる。
+   */
+  async changePassword(input: ChangePasswordInput): Promise<void> {
+    const deps = this.requireDeps();
+
+    const existing = await deps.users.findById(input.userId);
+    if (!existing) throw new UserNotFoundError();
+    if (existing.lockedAt) throw new UserAccountLockedError();
+
+    const matched = await verifySecret(
+      input.currentPassword,
+      existing.passwordHash,
+    );
+    if (!matched) throw new InvalidCredentialsError();
+
+    const passwordHash = await hashSecret(input.newPassword);
+    const updated = await deps.users.updatePasswordHash(
+      input.userId,
+      passwordHash,
+    );
+    if (!updated) throw new UserNotFoundError();
+
+    await deps.refreshTokens.revokeAllForUser(input.userId);
   }
 }

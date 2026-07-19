@@ -129,3 +129,29 @@ export async function updateDisplayName(req: Request, res: Response) {
     return handleControllerError(res, error);
   }
 }
+
+/** PATCH /user/password — パスワード変更（要 access token） */
+export async function changePassword(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return handleControllerError(res, new InvalidAccessTokenError());
+  }
+
+  const body = (req.body ?? {}) as JsonBody;
+  const currentPassword = readString(body, "currentPassword");
+  const newPassword = readString(body, "newPassword");
+
+  if (!currentPassword) return badRequest(res, "currentPassword is required");
+  if (!newPassword) return badRequest(res, "newPassword is required");
+
+  try {
+    await createUserService(req).changePassword({
+      userId,
+      currentPassword,
+      newPassword,
+    });
+    return res.status(204).send();
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}

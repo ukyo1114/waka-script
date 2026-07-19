@@ -89,6 +89,29 @@
 
 ---
 
+## パスワード変更
+
+`PATCH /user/password`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+**Body:** `{ "currentPassword": string, "newPassword": string }`
+
+**成功:** `204`
+
+現在のパスワードを確認してから更新する。成功後、そのユーザーのリフレッシュトークンはすべて失効する（再ログインが必要）。
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| access token 無効・欠落 | `401 invalid_access_token` |
+| 現在のパスワード不一致 | `401 invalid_credentials` |
+| ユーザー不存在 | `404 user_not_found` |
+| アカウントロック | `403 user_account_locked` |
+
+---
+
 ## 環境変数
 
 | 変数 | 用途 |

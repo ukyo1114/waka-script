@@ -24,7 +24,7 @@ import {
   UserAccountLockedError,
   UserNotFoundError,
 } from "../../shared/errors.js";
-import { hashSecret } from "../../shared/hash.js";
+import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { formatOpaqueToken, parseOpaqueToken } from "../../shared/random-token.js";
 import { UserService } from "./service.js";
 
@@ -118,8 +118,19 @@ class FakeUserRepository implements UserRepository {
     return updated;
   }
 
-  async updatePasswordHash(): Promise<UserRecord | null> {
-    throw new Error("unused");
+  async updatePasswordHash(
+    id: string,
+    passwordHash: string,
+  ): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const updated = {
+      ...current,
+      passwordHash,
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
   }
 
   async updateDisplayName(
@@ -216,8 +227,18 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
     return updated;
   }
 
-  async revokeAllForUser(): Promise<number> {
-    return 0;
+  async revokeAllForUser(
+    userId: string,
+    revokedAt = new Date(),
+  ): Promise<number> {
+    let count = 0;
+    for (const [id, token] of this.byId) {
+      if (token.userId !== userId || token.revokedAt !== null) continue;
+      this.byId.set(id, { ...token, revokedAt });
+      this.revoked.push({ id, replacedByTokenId: null });
+      count += 1;
+    }
+    return count;
   }
 }
 
@@ -531,6 +552,59 @@ describe("UserService.updateDisplayName", () => {
           displayName: "新名前",
         }),
       UserAccountLockedError,
+    );
+  });
+});
+
+describe("UserService.changePassword", () => {
+  it("現在のパスワードが正しければ更新する", async () => {
+    const passwordHash = await hashSecret("old-password");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "user@example.com",
+        passwordHash,
+      }),
+    );
+    const { userService, refreshTokens } = service({ users });
+    await userService.login({
+      email: "user@example.com",
+      password: "old-password",
+    });
+
+    await userService.changePassword({
+      userId: "user-1",
+      currentPassword: "old-password",
+      newPassword: "new-password",
+    });
+
+    const updated = await users.findById("user-1");
+    assert.ok(updated);
+    assert.equal(await verifySecret("new-password", updated.passwordHash), true);
+    assert.equal(await verifySecret("old-password", updated.passwordHash), false);
+    assert.ok(refreshTokens.revoked.length >= 1);
+  });
+
+  it("現在のパスワードが違うと拒否する", async () => {
+    const passwordHash = await hashSecret("old-password");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        passwordHash,
+      }),
+    );
+    const { userService } = service({ users });
+
+    await assert.rejects(
+      () =>
+        userService.changePassword({
+          userId: "user-1",
+          currentPassword: "wrong",
+          newPassword: "new-password",
+        }),
+      InvalidCredentialsError,
     );
   });
 });
