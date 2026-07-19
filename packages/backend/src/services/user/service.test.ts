@@ -6,17 +6,28 @@ import type {
   EmailTokenRepository,
 } from "../../repositories/email-token/index.js";
 import type {
+  CreateRefreshTokenInput,
+  RefreshToken,
+  RefreshTokenRepository,
+} from "../../repositories/refresh-token/index.js";
+import type {
   CreateUserInput,
   UserRecord,
   UserRepository,
 } from "../../repositories/user/index.js";
+import { verifyAccessToken } from "../../shared/access-token.js";
 import {
   EmailAlreadyRegisteredError,
+  InvalidCredentialsError,
   InvalidEmailTokenError,
+  InvalidRefreshTokenError,
+  UserAccountLockedError,
 } from "../../shared/errors.js";
 import { hashSecret } from "../../shared/hash.js";
-import { formatEmailToken } from "../../shared/random-token.js";
+import { formatOpaqueToken, parseOpaqueToken } from "../../shared/random-token.js";
 import { UserService } from "./service.js";
+
+const JWT_SECRET = "test-access-jwt-secret";
 
 function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();
@@ -48,10 +59,31 @@ function createEmailToken(overrides: Partial<EmailToken> = {}): EmailToken {
   };
 }
 
+function createRefreshTokenRecord(
+  overrides: Partial<RefreshToken> = {},
+): RefreshToken {
+  const now = new Date();
+  return {
+    id: "refresh-1",
+    userId: "user-1",
+    tokenHash: "hash",
+    expiresAt: new Date(now.getTime() + 86_400_000),
+    revokedAt: null,
+    replacedByTokenId: null,
+    createdAt: now,
+    ...overrides,
+  };
+}
+
 class FakeUserRepository implements UserRepository {
   created: CreateUserInput[] = [];
   users = new Map<string, UserRecord>();
   private seq = 0;
+
+  seed(user: UserRecord) {
+    this.users.set(user.id, user);
+    this.users.set(`email:${user.email}`, user);
+  }
 
   async create(input: CreateUserInput): Promise<UserRecord> {
     this.created.push(input);
@@ -62,8 +94,7 @@ class FakeUserRepository implements UserRepository {
       passwordHash: input.passwordHash,
       displayName: input.displayName,
     });
-    this.users.set(user.id, user);
-    this.users.set(`email:${user.email}`, user);
+    this.seed(user);
     return user;
   }
 
@@ -82,8 +113,7 @@ class FakeUserRepository implements UserRepository {
     const current = this.users.get(id);
     if (!current) return null;
     const updated = { ...current, emailVerifiedAt: verifiedAt };
-    this.users.set(id, updated);
-    this.users.set(`email:${updated.email}`, updated);
+    this.seed(updated);
     return updated;
   }
 
@@ -134,6 +164,68 @@ class FakeEmailTokenRepository implements EmailTokenRepository {
   }
 }
 
+class FakeRefreshTokenRepository implements RefreshTokenRepository {
+  created: CreateRefreshTokenInput[] = [];
+  revoked: { id: string; replacedByTokenId: string | null }[] = [];
+  private byId = new Map<string, RefreshToken>();
+  private seq = 0;
+
+  async create(input: CreateRefreshTokenInput): Promise<RefreshToken> {
+    this.created.push(input);
+    this.seq += 1;
+    const record = createRefreshTokenRecord({
+      id: `refresh-${this.seq}`,
+      userId: input.userId,
+      tokenHash: input.tokenHash,
+      expiresAt: input.expiresAt,
+    });
+    this.byId.set(record.id, record);
+    return record;
+  }
+
+  async findById(id: string): Promise<RefreshToken | null> {
+    return this.byId.get(id) ?? null;
+  }
+
+  async revoke(
+    id: string,
+    revokedAt = new Date(),
+    replacedByTokenId: string | null = null,
+  ): Promise<RefreshToken | null> {
+    this.revoked.push({ id, replacedByTokenId });
+    const current = this.byId.get(id);
+    if (!current) return null;
+    const updated = { ...current, revokedAt, replacedByTokenId };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async revokeAllForUser(): Promise<number> {
+    return 0;
+  }
+}
+
+function service(deps?: {
+  users?: FakeUserRepository;
+  emailTokens?: FakeEmailTokenRepository;
+  refreshTokens?: FakeRefreshTokenRepository;
+}) {
+  const users = deps?.users ?? new FakeUserRepository();
+  const emailTokens = deps?.emailTokens ?? new FakeEmailTokenRepository();
+  const refreshTokens = deps?.refreshTokens ?? new FakeRefreshTokenRepository();
+  return {
+    users,
+    emailTokens,
+    refreshTokens,
+    userService: new UserService({
+      users,
+      emailTokens,
+      refreshTokens,
+      jwtSecret: JWT_SECRET,
+    }),
+  };
+}
+
 async function seedRegisterToken(
   tokens: FakeEmailTokenRepository,
   email = "new@example.com",
@@ -147,17 +239,15 @@ async function seedRegisterToken(
     tokenHash,
   });
   tokens.seed(record);
-  return formatEmailToken(record.id, secret);
+  return formatOpaqueToken(record.id, secret);
 }
 
 describe("UserService.register", () => {
   it("有効なトークンならユーザーを作成する", async () => {
-    const users = new FakeUserRepository();
-    const emailTokens = new FakeEmailTokenRepository();
+    const { userService, users, emailTokens } = service();
     const token = await seedRegisterToken(emailTokens);
-    const service = new UserService({ users, emailTokens });
 
-    const user = await service.register({
+    const user = await userService.register({
       token,
       password: "password123",
       displayName: "太郎",
@@ -172,13 +262,10 @@ describe("UserService.register", () => {
   });
 
   it("不正なトークンなら拒否する", async () => {
-    const service = new UserService({
-      users: new FakeUserRepository(),
-      emailTokens: new FakeEmailTokenRepository(),
-    });
+    const { userService } = service();
     await assert.rejects(
       () =>
-        service.register({
+        userService.register({
           token: "invalid",
           password: "password123",
           displayName: "太郎",
@@ -188,19 +275,17 @@ describe("UserService.register", () => {
   });
 
   it("既に登録済みのメールなら拒否する", async () => {
-    const users = new FakeUserRepository();
-    const emailTokens = new FakeEmailTokenRepository();
+    const { userService, users, emailTokens } = service();
     const token = await seedRegisterToken(emailTokens);
     await users.create({
       email: "new@example.com",
       passwordHash: "x",
       displayName: "既存",
     });
-    const service = new UserService({ users, emailTokens });
 
     await assert.rejects(
       () =>
-        service.register({
+        userService.register({
           token,
           password: "password123",
           displayName: "太郎",
@@ -210,8 +295,7 @@ describe("UserService.register", () => {
   });
 
   it("register 以外の purpose トークンは拒否する", async () => {
-    const users = new FakeUserRepository();
-    const emailTokens = new FakeEmailTokenRepository();
+    const { userService, emailTokens } = service();
     const secret = "reset-secret";
     const tokenHash = await hashSecret(secret);
     emailTokens.seed(
@@ -223,16 +307,160 @@ describe("UserService.register", () => {
         userId: "user-1",
       }),
     );
-    const service = new UserService({ users, emailTokens });
 
     await assert.rejects(
       () =>
-        service.register({
-          token: formatEmailToken("token-reset-1", secret),
+        userService.register({
+          token: formatOpaqueToken("token-reset-1", secret),
           password: "password123",
           displayName: "太郎",
         }),
       InvalidEmailTokenError,
+    );
+  });
+});
+
+describe("UserService.login", () => {
+  it("正しい認証情報なら access / refresh を返す", async () => {
+    const passwordHash = await hashSecret("password123");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "user@example.com",
+        passwordHash,
+        displayName: "花子",
+      }),
+    );
+    const { userService, refreshTokens } = service({ users });
+
+    const result = await userService.login({
+      email: "user@example.com",
+      password: "password123",
+    });
+
+    assert.equal(result.user.id, "user-1");
+    assert.ok(result.accessToken);
+    assert.ok(result.refreshToken);
+    assert.equal(refreshTokens.created.length, 1);
+
+    const claims = await verifyAccessToken({
+      token: result.accessToken,
+      secret: JWT_SECRET,
+    });
+    assert.equal(claims.userId, "user-1");
+  });
+
+  it("パスワード不一致なら拒否する", async () => {
+    const passwordHash = await hashSecret("password123");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        email: "user@example.com",
+        passwordHash,
+      }),
+    );
+    const { userService } = service({ users });
+
+    await assert.rejects(
+      () =>
+        userService.login({
+          email: "user@example.com",
+          password: "wrong",
+        }),
+      InvalidCredentialsError,
+    );
+  });
+
+  it("ロック中ユーザーは拒否する", async () => {
+    const passwordHash = await hashSecret("password123");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        email: "user@example.com",
+        passwordHash,
+        lockedAt: new Date(),
+      }),
+    );
+    const { userService } = service({ users });
+
+    await assert.rejects(
+      () =>
+        userService.login({
+          email: "user@example.com",
+          password: "password123",
+        }),
+      UserAccountLockedError,
+    );
+  });
+});
+
+describe("UserService.refreshTokens", () => {
+  it("有効な refresh ならトークンをローテーションする", async () => {
+    const passwordHash = await hashSecret("password123");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "user@example.com",
+        passwordHash,
+      }),
+    );
+    const { userService, refreshTokens } = service({ users });
+    const loggedIn = await userService.login({
+      email: "user@example.com",
+      password: "password123",
+    });
+
+    const refreshed = await userService.refreshTokens({
+      refreshToken: loggedIn.refreshToken,
+    });
+
+    assert.ok(refreshed.accessToken);
+    assert.ok(refreshed.refreshToken);
+    assert.notEqual(refreshed.refreshToken, loggedIn.refreshToken);
+    assert.equal(refreshTokens.revoked.length, 1);
+
+    const oldParsed = parseOpaqueToken(loggedIn.refreshToken);
+    assert.ok(oldParsed);
+    assert.equal(refreshTokens.revoked[0]?.id, oldParsed.id);
+
+    await assert.rejects(
+      () =>
+        userService.refreshTokens({
+          refreshToken: loggedIn.refreshToken,
+        }),
+      InvalidRefreshTokenError,
+    );
+  });
+});
+
+describe("UserService.logout", () => {
+  it("refresh を失効させる", async () => {
+    const passwordHash = await hashSecret("password123");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "user@example.com",
+        passwordHash,
+      }),
+    );
+    const { userService, refreshTokens } = service({ users });
+    const loggedIn = await userService.login({
+      email: "user@example.com",
+      password: "password123",
+    });
+
+    await userService.logout({ refreshToken: loggedIn.refreshToken });
+    assert.equal(refreshTokens.revoked.length, 1);
+
+    await assert.rejects(
+      () =>
+        userService.refreshTokens({
+          refreshToken: loggedIn.refreshToken,
+        }),
+      InvalidRefreshTokenError,
     );
   });
 });

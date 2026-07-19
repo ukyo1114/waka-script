@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   createRandomToken,
-  formatEmailToken,
-  parseEmailToken,
+  formatOpaqueToken,
+  parseOpaqueToken,
 } from "./random-token.js";
 
 describe("createRandomToken", () => {
@@ -20,20 +20,20 @@ describe("createRandomToken", () => {
   });
 });
 
-describe("formatEmailToken / parseEmailToken", () => {
+describe("formatOpaqueToken / parseOpaqueToken", () => {
   it("id と secret を往復できる", () => {
-    const formatted = formatEmailToken("tok-1", "secret-value");
+    const formatted = formatOpaqueToken("tok-1", "secret-value");
     assert.equal(formatted, "tok-1.secret-value");
-    assert.deepEqual(parseEmailToken(formatted), {
+    assert.deepEqual(parseOpaqueToken(formatted), {
       id: "tok-1",
       secret: "secret-value",
     });
   });
 
   it("不正な形式は null を返す", () => {
-    assert.equal(parseEmailToken(""), null);
-    assert.equal(parseEmailToken("no-dot"), null);
-    assert.equal(parseEmailToken(".onlysecret"), null);
-    assert.equal(parseEmailToken("onlyid."), null);
+    assert.equal(parseOpaqueToken(""), null);
+    assert.equal(parseOpaqueToken("no-dot"), null);
+    assert.equal(parseOpaqueToken(".onlysecret"), null);
+    assert.equal(parseOpaqueToken("onlyid."), null);
   });
 });

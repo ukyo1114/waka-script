@@ -70,3 +70,31 @@ export class InvalidEmailTokenError extends AppError {
     this.name = "InvalidEmailTokenError";
   }
 }
+
+export class InvalidCredentialsError extends AppError {
+  constructor() {
+    super(401, "invalid_credentials", "email or password is incorrect");
+    this.name = "InvalidCredentialsError";
+  }
+}
+
+export class InvalidAccessTokenError extends AppError {
+  constructor() {
+    super(401, "invalid_access_token", "access token is invalid or expired");
+    this.name = "InvalidAccessTokenError";
+  }
+}
+
+export class InvalidRefreshTokenError extends AppError {
+  constructor() {
+    super(401, "invalid_refresh_token", "refresh token is invalid or expired");
+    this.name = "InvalidRefreshTokenError";
+  }
+}
+
+export class UserAccountLockedError extends AppError {
+  constructor() {
+    super(403, "user_account_locked", "user account is locked");
+    this.name = "UserAccountLockedError";
+  }
+}

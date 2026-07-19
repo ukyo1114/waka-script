@@ -9,17 +9,17 @@ export function createRandomToken(bytes = 32): string {
  * クライアントへ返す形式: `{id}.{secret}`
  * id で DB 検索し、secret を bcrypt 照合する。
  */
-export function formatEmailToken(id: string, secret: string): string {
+export function formatOpaqueToken(id: string, secret: string): string {
   return `${id}.${secret}`;
 }
 
-export type ParsedEmailToken = {
+export type ParsedOpaqueToken = {
   id: string;
   secret: string;
 };
 
 /** `{id}.{secret}` を分解する。不正なら null */
-export function parseEmailToken(token: string): ParsedEmailToken | null {
+export function parseOpaqueToken(token: string): ParsedOpaqueToken | null {
   const separator = token.indexOf(".");
   if (separator <= 0 || separator === token.length - 1) return null;
   const id = token.slice(0, separator);
@@ -27,3 +27,9 @@ export function parseEmailToken(token: string): ParsedEmailToken | null {
   if (!id || !secret) return null;
   return { id, secret };
 }
+
+/** @deprecated formatOpaqueToken を使う */
+export const formatEmailToken = formatOpaqueToken;
+/** @deprecated parseOpaqueToken を使う */
+export const parseEmailToken = parseOpaqueToken;
+export type ParsedEmailToken = ParsedOpaqueToken;

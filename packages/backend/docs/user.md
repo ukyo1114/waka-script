@@ -10,44 +10,67 @@
 
 メールアドレスはトークンに紐づく値を使う（body では受け取らない）。
 
-```mermaid
-sequenceDiagram
-  participant C as Client
-  participant Ctrl as Controller
-  participant Svc as UserService
-  participant Repo as Repository
-
-  C->>Ctrl: POST /user/register
-  Ctrl->>Ctrl: token / password / displayName を検証
-  Ctrl->>Svc: register
-  Svc->>Repo: アクション用トークンを検証 (purpose=register)
-  Svc->>Repo: findByEmail（未登録であること）
-  Svc->>Svc: パスワードをハッシュ化
-  Svc->>Repo: create / markEmailVerified
-  Svc->>Repo: トークンを使用済みに
-  Svc-->>Ctrl: User
-  Ctrl-->>C: 201 { id, email, displayName }
-```
-
-### 失敗時
-
-| 条件 | レスポンス |
-|------|------------|
-| token / password / displayName 欠落 | `400` |
-| トークン無効・期限切れ・purpose 不一致 | `400 invalid_email_token` |
-| メールが既に登録済み | `409 email_already_registered` |
+成功時: `201 { id, email, displayName }`（トークンは発行しない。ログインで取得）
 
 ### 前提フロー
 
 1. `POST /email/send/register` `{ email }`
 2. `POST /email/verify/register` `{ email, code }` → `{ token }`
 3. `POST /user/register` `{ token, password, displayName }`
+4. `POST /user/login` `{ email, password }` → access / refresh
 
 ---
 
-## その他（未実装）
+## ログイン
 
-| メソッド | パス | 状態 |
-|----------|------|------|
-| POST | `/user/login` | 501 |
-| POST | `/user/logout` | 501 |
+`POST /user/login`
+
+**Body:** `{ "email": string, "password": string }`
+
+**成功:** `200 { id, email, displayName, accessToken, refreshToken }`
+
+| トークン | 形式 | 保存 | 有効期限 |
+|----------|------|------|----------|
+| Access | JWT (`typ: access`) | なし（署名検証のみ） | 15分 |
+| Refresh | opaque `{id}.{secret}` | DB に hash のみ | 30日 |
+
+保護 API では `Authorization: Bearer <accessToken>` を使う（`requireAccessToken` ミドルウェア）。
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| 認証失敗 | `401 invalid_credentials` |
+| アカウントロック | `403 user_account_locked` |
+
+---
+
+## トークン更新
+
+`POST /user/token/refresh`
+
+**Body:** `{ "refreshToken": string }`
+
+**成功:** `200 { accessToken, refreshToken }`
+
+旧 refresh は失効し、新しいペアを返す（ローテーション）。
+
+---
+
+## ログアウト
+
+`POST /user/logout`
+
+**Body:** `{ "refreshToken": string }`
+
+**成功:** `204`
+
+当該 refresh を revoke する。access JWT は DB 管理しないため、期限切れまで形式上は有効（短命）。
+
+---
+
+## 環境変数
+
+| 変数 | 用途 |
+|------|------|
+| `JWT_SECRET` | アクセス JWT の署名鍵 |

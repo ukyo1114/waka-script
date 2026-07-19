@@ -11,8 +11,8 @@ import {
 
 function createUserService(req: Request): UserService {
   try {
-    const { users, emailTokens } = getRepositories(req);
-    return new UserService({ users, emailTokens });
+    const { users, emailTokens, refreshTokens } = getRepositories(req);
+    return new UserService({ users, emailTokens, refreshTokens });
   } catch {
     throw new NotImplementedError("user.repositories");
   }
@@ -55,11 +55,31 @@ export async function login(req: Request, res: Response) {
   if (!password) return badRequest(res, "password is required");
 
   try {
-    const user = await createUserService(req).login({ email, password });
+    const result = await createUserService(req).login({ email, password });
     return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
+      id: result.user.id,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** POST /user/token/refresh */
+export async function refresh(req: Request, res: Response) {
+  const body = (req.body ?? {}) as JsonBody;
+  const refreshToken = readString(body, "refreshToken");
+
+  if (!refreshToken) return badRequest(res, "refreshToken is required");
+
+  try {
+    const tokens = await createUserService(req).refreshTokens({ refreshToken });
+    return res.status(200).json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     });
   } catch (error) {
     return handleControllerError(res, error);
@@ -68,8 +88,13 @@ export async function login(req: Request, res: Response) {
 
 /** POST /user/logout */
 export async function logout(req: Request, res: Response) {
+  const body = (req.body ?? {}) as JsonBody;
+  const refreshToken = readString(body, "refreshToken");
+
+  if (!refreshToken) return badRequest(res, "refreshToken is required");
+
   try {
-    await createUserService(req).logout();
+    await createUserService(req).logout({ refreshToken });
     return res.status(204).send();
   } catch (error) {
     return handleControllerError(res, error);
