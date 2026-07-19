@@ -3,13 +3,28 @@ import type { Repositories } from "./repositories/index.js";
 import { avatarRouter } from "./routes/avatar.js";
 import { emailRouter } from "./routes/email.js";
 import { userRouter } from "./routes/user.js";
+import { getObjectStorageImpl } from "./shared/get-object-storage.js";
+import type { ObjectStorage } from "./shared/object-storage.js";
 
-export function createApp(repos?: Repositories) {
+export type CreateAppOptions = {
+  repos?: Repositories;
+  objectStorage?: ObjectStorage;
+};
+
+export function createApp(options?: CreateAppOptions | Repositories) {
   const app = express();
 
-  if (repos) {
-    app.locals.repos = repos;
+  // 互換: 旧シグネチャ createApp(repos)
+  const opts: CreateAppOptions =
+    options && "users" in options
+      ? { repos: options }
+      : (options ?? {});
+
+  if (opts.repos) {
+    app.locals.repos = opts.repos;
   }
+
+  app.locals.objectStorage = opts.objectStorage ?? getObjectStorageImpl();
 
   app.use(express.json());
 

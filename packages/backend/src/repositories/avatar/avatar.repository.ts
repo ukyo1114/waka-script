@@ -27,4 +27,8 @@ export class AvatarRepositoryImpl implements AvatarRepository {
   countByUserId(_userId: UserId): Promise<number> {
     return notImplemented();
   }
+
+  updateName(_id: AvatarId, _name: string): Promise<Avatar | null> {
+    return notImplemented();
+  }
 }

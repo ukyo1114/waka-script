@@ -1,1 +1,6 @@
-export { createAvatar, listAvatars } from "./avatar.controller.js";
+export {
+  createAvatar,
+  listAvatars,
+  updateAvatarImage,
+  updateAvatarName,
+} from "./avatar.controller.js";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEFAULT_AVATAR_IMAGE_URL,
+  buildAvatarImageUrl,
   type Avatar,
 } from "../../domain/avatar/index.js";
 import type {
@@ -13,10 +13,16 @@ import type {
   UserRepository,
 } from "../../repositories/user/index.js";
 import {
+  AvatarAccessDeniedError,
   AvatarLimitExceededError,
+  AvatarNotFoundError,
+  InvalidAvatarImageError,
   UserNotFoundError,
 } from "../../shared/errors.js";
+import type { ObjectStorage, PutObjectInput } from "../../shared/object-storage.js";
 import { AvatarService } from "./service.js";
+
+const PUBLIC_BASE = "https://cdn.test";
 
 function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();
@@ -62,13 +68,11 @@ class FakeUserRepository implements UserRepository {
 
 class FakeAvatarRepository implements AvatarRepository {
   items: Avatar[] = [];
-  private seq = 0;
 
   async create(input: CreateAvatarInput): Promise<Avatar> {
-    this.seq += 1;
     const now = new Date();
     const avatar: Avatar = {
-      id: `avatar-${this.seq}`,
+      id: input.id,
       userId: input.userId,
       name: input.name,
       imageUrl: input.imageUrl,
@@ -90,29 +94,50 @@ class FakeAvatarRepository implements AvatarRepository {
   async countByUserId(userId: string): Promise<number> {
     return this.items.filter((a) => a.userId === userId).length;
   }
+
+  async updateName(id: string, name: string): Promise<Avatar | null> {
+    const avatar = this.items.find((a) => a.id === id);
+    if (!avatar) return null;
+    avatar.name = name;
+    avatar.updatedAt = new Date();
+    return avatar;
+  }
+}
+
+class FakeObjectStorage implements ObjectStorage {
+  puts: PutObjectInput[] = [];
+
+  async putObject(input: PutObjectInput): Promise<void> {
+    this.puts.push(input);
+  }
 }
 
 function service(user: UserRecord | null) {
   const avatars = new FakeAvatarRepository();
+  const objectStorage = new FakeObjectStorage();
   return {
     avatars,
+    objectStorage,
     avatarService: new AvatarService({
       users: new FakeUserRepository(user),
       avatars,
+      objectStorage,
+      avatarImagePublicBaseUrl: PUBLIC_BASE,
     }),
   };
 }
 
 describe("AvatarService.create", () => {
-  it("アバターを作成できる", async () => {
+  it("アバターを作成できる（imageUrl は id から生成）", async () => {
     const { avatarService, avatars } = service(createUserRecord());
     const avatar = await avatarService.create({
       userId: "user-1",
       name: "人狼",
-      imageUrl: "https://example.com/a.png",
     });
     assert.equal(avatar.name, "人狼");
+    assert.equal(avatar.imageUrl, buildAvatarImageUrl(avatar.id, PUBLIC_BASE));
     assert.equal(avatars.items.length, 1);
+    assert.equal(avatars.items[0]?.id, avatar.id);
   });
 
   it("登録ユーザーは 10 件まで", async () => {
@@ -121,7 +146,6 @@ describe("AvatarService.create", () => {
       await avatarService.create({
         userId: "user-1",
         name: `A${i}`,
-        imageUrl: "https://example.com/a.png",
       });
     }
     await assert.rejects(
@@ -129,7 +153,6 @@ describe("AvatarService.create", () => {
         avatarService.create({
           userId: "user-1",
           name: "over",
-          imageUrl: "https://example.com/a.png",
         }),
       AvatarLimitExceededError,
     );
@@ -142,14 +165,12 @@ describe("AvatarService.create", () => {
     await avatarService.create({
       userId: "user-1",
       name: "GuestAvatar",
-      imageUrl: "https://example.com/a.png",
     });
     await assert.rejects(
       () =>
         avatarService.create({
           userId: "user-1",
           name: "second",
-          imageUrl: "https://example.com/a.png",
         }),
       AvatarLimitExceededError,
     );
@@ -162,7 +183,6 @@ describe("AvatarService.create", () => {
         avatarService.create({
           userId: "missing",
           name: "x",
-          imageUrl: "https://example.com/a.png",
         }),
       UserNotFoundError,
     );
@@ -170,14 +190,14 @@ describe("AvatarService.create", () => {
 });
 
 describe("AvatarService.createInitial", () => {
-  it("デフォルト画像で作成する", async () => {
+  it("表示名と id 由来の imageUrl で作成する", async () => {
     const { avatarService } = service(createUserRecord());
     const avatar = await avatarService.createInitial({
       userId: "user-1",
       displayName: "太郎",
     });
     assert.equal(avatar.name, "太郎");
-    assert.equal(avatar.imageUrl, DEFAULT_AVATAR_IMAGE_URL);
+    assert.equal(avatar.imageUrl, buildAvatarImageUrl(avatar.id, PUBLIC_BASE));
   });
 });
 
@@ -187,10 +207,100 @@ describe("AvatarService.list", () => {
     await avatarService.create({
       userId: "user-1",
       name: "A",
-      imageUrl: "https://example.com/a.png",
     });
     const list = await avatarService.list({ userId: "user-1" });
     assert.equal(list.length, 1);
     assert.equal(list[0]?.name, "A");
+  });
+});
+
+describe("AvatarService.updateName", () => {
+  it("名前を更新できる", async () => {
+    const { avatarService } = service(createUserRecord());
+    const created = await avatarService.create({
+      userId: "user-1",
+      name: "旧",
+    });
+    const updated = await avatarService.updateName({
+      userId: "user-1",
+      avatarId: created.id,
+      name: "新",
+    });
+    assert.equal(updated.name, "新");
+    assert.equal(updated.imageUrl, created.imageUrl);
+  });
+
+  it("他人のアバターは拒否する", async () => {
+    const { avatarService, avatars } = service(createUserRecord());
+    const now = new Date();
+    avatars.items.push({
+      id: "other-avatar",
+      userId: "other-user",
+      name: "他",
+      imageUrl: "https://cdn.test/avatars/other-avatar",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await assert.rejects(
+      () =>
+        avatarService.updateName({
+          userId: "user-1",
+          avatarId: "other-avatar",
+          name: "奪取",
+        }),
+      AvatarAccessDeniedError,
+    );
+  });
+
+  it("存在しないと拒否する", async () => {
+    const { avatarService } = service(createUserRecord());
+    await assert.rejects(
+      () =>
+        avatarService.updateName({
+          userId: "user-1",
+          avatarId: "missing",
+          name: "x",
+        }),
+      AvatarNotFoundError,
+    );
+  });
+});
+
+describe("AvatarService.updateImage", () => {
+  it("同一キーへ put し imageUrl は変えない", async () => {
+    const { avatarService, objectStorage } = service(createUserRecord());
+    const created = await avatarService.create({
+      userId: "user-1",
+      name: "A",
+    });
+    const urlBefore = created.imageUrl;
+    const result = await avatarService.updateImage({
+      userId: "user-1",
+      avatarId: created.id,
+      body: Buffer.from("png-bytes"),
+      contentType: "image/png",
+    });
+    assert.equal(result.imageUrl, urlBefore);
+    assert.equal(objectStorage.puts.length, 1);
+    assert.equal(objectStorage.puts[0]?.key, `avatars/${created.id}`);
+    assert.equal(objectStorage.puts[0]?.contentType, "image/png");
+  });
+
+  it("不正な content type は拒否する", async () => {
+    const { avatarService } = service(createUserRecord());
+    const created = await avatarService.create({
+      userId: "user-1",
+      name: "A",
+    });
+    await assert.rejects(
+      () =>
+        avatarService.updateImage({
+          userId: "user-1",
+          avatarId: created.id,
+          body: Buffer.from("x"),
+          contentType: "application/pdf",
+        }),
+      InvalidAvatarImageError,
+    );
   });
 });

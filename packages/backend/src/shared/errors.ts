@@ -127,3 +127,24 @@ export class AvatarLimitExceededError extends AppError {
     this.name = "AvatarLimitExceededError";
   }
 }
+
+export class AvatarNotFoundError extends AppError {
+  constructor() {
+    super(404, "avatar_not_found", "avatar not found");
+    this.name = "AvatarNotFoundError";
+  }
+}
+
+export class AvatarAccessDeniedError extends AppError {
+  constructor() {
+    super(403, "avatar_access_denied", "avatar does not belong to the user");
+    this.name = "AvatarAccessDeniedError";
+  }
+}
+
+export class InvalidAvatarImageError extends AppError {
+  constructor(message = "avatar image is invalid") {
+    super(400, "invalid_avatar_image", message);
+    this.name = "InvalidAvatarImageError";
+  }
+}

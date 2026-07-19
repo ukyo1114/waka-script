@@ -1,5 +1,6 @@
 export type {
   AssertAvatarCreatable,
+  AssertAvatarOwnedByUser,
   Avatar,
   AvatarId,
   GetAvatarLimit,
@@ -7,6 +8,12 @@ export type {
 export {
   AVATAR_LIMIT_GUEST,
   AVATAR_LIMIT_REGISTERED,
-  DEFAULT_AVATAR_IMAGE_URL,
+  DEFAULT_AVATAR_IMAGE_PUBLIC_BASE_URL,
 } from "./avatar.types.js";
-export { assertAvatarCreatable, getAvatarLimit } from "./avatar.domain.js";
+export {
+  assertAvatarCreatable,
+  assertAvatarOwnedByUser,
+  buildAvatarImageUrl,
+  buildAvatarObjectKey,
+  getAvatarLimit,
+} from "./avatar.domain.js";

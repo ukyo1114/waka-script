@@ -31,10 +31,15 @@ export {
   UserNotFoundError,
   GuestActionNotAllowedError,
   AvatarLimitExceededError,
+  AvatarNotFoundError,
+  AvatarAccessDeniedError,
+  InvalidAvatarImageError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";
-export {
+export type { ObjectStorage, PutObjectInput } from "./object-storage.js";
+export { ObjectStorageImpl } from "./object-storage.js";
+export { getObjectStorage, getObjectStorageImpl } from "./get-object-storage.js";export {
   badRequest,
   handleControllerError,
   readString,

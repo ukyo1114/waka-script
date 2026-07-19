@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_AVATAR_IMAGE_URL, type Avatar } from "../../domain/avatar/index.js";
+import {
+  buildAvatarImageUrl,
+  type Avatar,
+} from "../../domain/avatar/index.js";
 import type {
   AvatarRepository,
   CreateAvatarInput,
@@ -254,13 +257,11 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
 
 class FakeAvatarRepository implements AvatarRepository {
   items: Avatar[] = [];
-  private seq = 0;
 
   async create(input: CreateAvatarInput): Promise<Avatar> {
-    this.seq += 1;
     const now = new Date();
     const avatar: Avatar = {
-      id: `avatar-${this.seq}`,
+      id: input.id,
       userId: input.userId,
       name: input.name,
       imageUrl: input.imageUrl,
@@ -281,6 +282,14 @@ class FakeAvatarRepository implements AvatarRepository {
 
   async countByUserId(userId: string): Promise<number> {
     return this.items.filter((a) => a.userId === userId).length;
+  }
+
+  async updateName(id: string, name: string): Promise<Avatar | null> {
+    const avatar = this.items.find((a) => a.id === id);
+    if (!avatar) return null;
+    avatar.name = name;
+    avatar.updatedAt = new Date();
+    return avatar;
   }
 }
 
@@ -344,7 +353,10 @@ describe("UserService.register", () => {
     assert.equal("passwordHash" in user, false);
     assert.equal(avatars.items.length, 1);
     assert.equal(avatars.items[0]?.name, "太郎");
-    assert.equal(avatars.items[0]?.imageUrl, DEFAULT_AVATAR_IMAGE_URL);
+    assert.equal(
+      avatars.items[0]?.imageUrl,
+      buildAvatarImageUrl(avatars.items[0]!.id),
+    );
   });
 
   it("不正なトークンなら拒否する", async () => {
