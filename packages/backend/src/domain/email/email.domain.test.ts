@@ -26,6 +26,8 @@ const createUser = (overrides: Partial<User> = {}): User => {
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

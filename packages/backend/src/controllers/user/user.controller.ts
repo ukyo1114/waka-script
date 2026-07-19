@@ -9,6 +9,8 @@ import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
   changePasswordBodySchema,
+  completeEmailChangeBodySchema,
+  completePasswordResetBodySchema,
   guestLoginBodySchema,
   loginBodySchema,
   refreshTokenBodySchema,
@@ -179,6 +181,64 @@ export async function getMe(req: Request, res: Response) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** PATCH /user/email — メール変更確定（要 access token + email-change token） */
+export async function completeEmailChange(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return handleControllerError(res, new InvalidAccessTokenError());
+  }
+
+  const parsed = parseWithSchema(completeEmailChangeBodySchema, req.body, res);
+  if (!parsed.ok) return;
+
+  try {
+    const user = await createUserService(req).completeEmailChange({
+      userId,
+      token: parsed.data.token,
+    });
+    return res.status(200).json({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      isGuest: user.isGuest,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** POST /user/password-reset — パスワードリセット確定（未ログイン可） */
+export async function completePasswordReset(req: Request, res: Response) {
+  const parsed = parseWithSchema(
+    completePasswordResetBodySchema,
+    req.body,
+    res,
+  );
+  if (!parsed.ok) return;
+
+  try {
+    await createUserService(req).completePasswordReset(parsed.data);
+    return res.status(204).send();
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** DELETE /user/account — アカウント論理削除（要 access token） */
+export async function deleteAccount(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return handleControllerError(res, new InvalidAccessTokenError());
+  }
+
+  try {
+    await createUserService(req).deleteAccount({ userId });
+    return res.status(204).send();
   } catch (error) {
     return handleControllerError(res, error);
   }

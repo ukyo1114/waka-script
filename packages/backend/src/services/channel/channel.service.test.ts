@@ -45,6 +45,8 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -76,7 +78,19 @@ class FakeUserRepository implements UserRepository {
   async updateDisplayName(): Promise<UserRecord | null> {
     return null;
   }
+  async updateEmail(): Promise<UserRecord | null> {
+    return null;
+  }
   async clearLock(): Promise<UserRecord | null> {
+    return null;
+  }
+  async recordFailedLogin(): Promise<UserRecord | null> {
+    return null;
+  }
+  async resetLoginAttempts(): Promise<UserRecord | null> {
+    return null;
+  }
+  async softDelete(): Promise<UserRecord | null> {
     return null;
   }
 }
@@ -112,6 +126,9 @@ class FakeAvatarRepository implements AvatarRepository {
 
   async updateName(): Promise<Avatar | null> {
     return null;
+  }
+  async delete(): Promise<boolean> {
+    return false;
   }
 }
 

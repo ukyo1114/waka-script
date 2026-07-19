@@ -25,6 +25,15 @@ export const changePasswordBodySchema = z.object({
   newPassword: nonEmptyString,
 });
 
+export const completeEmailChangeBodySchema = z.object({
+  token: nonEmptyString,
+});
+
+export const completePasswordResetBodySchema = z.object({
+  token: nonEmptyString,
+  newPassword: nonEmptyString,
+});
+
 export const guestLoginBodySchema = z
   .object({
     displayName: nonEmptyString.optional(),

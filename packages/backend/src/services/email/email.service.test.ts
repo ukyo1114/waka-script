@@ -35,6 +35,8 @@ function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -100,10 +102,24 @@ class FakeUserRepository implements UserRepository {
     this.user = { ...this.user, displayName };
     return this.user;
   }
+  async updateEmail(id: string, email: string): Promise<UserRecord | null> {
+    if (!this.user || this.user.id !== id) return null;
+    this.user = { ...this.user, email };
+    return this.user;
+  }
   async clearLock(id: string): Promise<UserRecord | null> {
     this.clearLockCalls.push(id);
     if (!this.user || this.user.id !== id) return null;
-    this.user = { ...this.user, lockedAt: null };
+    this.user = { ...this.user, lockedAt: null, loginAttempts: 0 };
+    return this.user;
+  }
+  async recordFailedLogin(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async resetLoginAttempts(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async softDelete(): Promise<UserRecord | null> {
     return this.user;
   }
 }

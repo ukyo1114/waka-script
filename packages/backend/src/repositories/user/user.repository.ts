@@ -44,7 +44,23 @@ export class UserRepositoryImpl implements UserRepository {
     return notImplemented();
   }
 
+  updateEmail(_id: UserId, _email: string): Promise<UserRecord | null> {
+    return notImplemented();
+  }
+
   clearLock(_id: UserId): Promise<UserRecord | null> {
+    return notImplemented();
+  }
+
+  recordFailedLogin(_id: UserId): Promise<UserRecord | null> {
+    return notImplemented();
+  }
+
+  resetLoginAttempts(_id: UserId): Promise<UserRecord | null> {
+    return notImplemented();
+  }
+
+  softDelete(_id: UserId): Promise<UserRecord | null> {
     return notImplemented();
   }
 }

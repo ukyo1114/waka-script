@@ -25,6 +25,13 @@ export interface UserRepository {
     id: UserId,
     displayName: string,
   ): Promise<UserRecord | null>;
-  /** アカウントロックを解除する（lockedAt を null にする） */
+  updateEmail(id: UserId, email: string): Promise<UserRecord | null>;
+  /** アカウントロックを解除する（lockedAt / loginAttempts をリセット） */
   clearLock(id: UserId): Promise<UserRecord | null>;
+  /** ログイン失敗を記録。上限到達時は lockedAt を設定して返す */
+  recordFailedLogin(id: UserId): Promise<UserRecord | null>;
+  /** ログイン成功時に試行回数をリセット */
+  resetLoginAttempts(id: UserId): Promise<UserRecord | null>;
+  /** 論理削除（deletedAt を設定） */
+  softDelete(id: UserId): Promise<UserRecord | null>;
 }

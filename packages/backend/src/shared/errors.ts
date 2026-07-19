@@ -142,6 +142,17 @@ export class AvatarAccessDeniedError extends AppError {
   }
 }
 
+export class AvatarMinimumRequiredError extends AppError {
+  constructor() {
+    super(
+      409,
+      "avatar_minimum_required",
+      "at least one avatar must remain",
+    );
+    this.name = "AvatarMinimumRequiredError";
+  }
+}
+
 export class InvalidAvatarImageError extends AppError {
   constructor(message = "avatar image is invalid") {
     super(400, "invalid_avatar_image", message);

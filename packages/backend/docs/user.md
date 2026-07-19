@@ -150,6 +150,59 @@
 
 ---
 
+## メールアドレス変更確定
+
+`PATCH /user/email`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+**Body:** `{ "token": string }`（`email-change` 検証後のアクション用トークン）
+
+Bearer で変更主体を、token で新メールの所有を証明する。成功後 token は使用済みになる。
+
+**成功:** `200 { id, email, displayName, isGuest }`
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| access token 無効 | `401 invalid_access_token` |
+| token 無効 | `401 invalid_email_token` |
+| 新メールが既に登録済み | `409 email_already_registered` |
+| ゲスト | `403 guest_action_not_allowed` |
+
+---
+
+## パスワードリセット確定
+
+`POST /user/password-reset`
+
+**Body:** `{ "token": string, "newPassword": string }`（未ログイン可）
+
+成功後、該当ユーザーのリフレッシュトークンはすべて失効する。
+
+**成功:** `204`
+
+---
+
+## アカウント削除
+
+`DELETE /user/account`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+論理削除（`deletedAt`）。リフレッシュトークンをすべて失効する。
+
+**成功:** `204`
+
+---
+
+## ログイン失敗ロック
+
+連続ログイン失敗が `MAX_LOGIN_ATTEMPTS`（5）に達すると `lockedAt` を設定し、以降のログインは `403 user_account_locked`。解除は `POST /email/verify/unlock`。
+
+---
+
 ## 環境変数
 
 | 変数 | 用途 |

@@ -67,6 +67,20 @@ export type ChangePasswordInput = {
   newPassword: string;
 };
 
+export type CompleteEmailChangeInput = {
+  userId: string;
+  token: string;
+};
+
+export type CompletePasswordResetInput = {
+  token: string;
+  newPassword: string;
+};
+
+export type DeleteAccountInput = {
+  userId: string;
+};
+
 export type UserServiceDeps = {
   users: UserRepository;
   emailTokens: EmailTokenRepository;
@@ -156,14 +170,19 @@ export class UserService {
     const email = normalizeEmail(input.email);
     const user = await deps.users.findByEmail(email);
 
-    if (!user || user.isGuest || user.passwordHash === null) {
+    if (!user || user.isGuest || user.passwordHash === null || user.deletedAt) {
       throw new InvalidCredentialsError();
     }
     if (user.lockedAt) throw new UserAccountLockedError();
 
     const matched = await verifySecret(input.password, user.passwordHash);
-    if (!matched) throw new InvalidCredentialsError();
+    if (!matched) {
+      const afterFail = await deps.users.recordFailedLogin(user.id);
+      if (afterFail?.lockedAt) throw new UserAccountLockedError();
+      throw new InvalidCredentialsError();
+    }
 
+    await deps.users.resetLoginAttempts(user.id);
     const tokens = await this.issueTokens(user.id);
     return { user: toPublicUser(user), ...tokens };
   }
@@ -278,8 +297,82 @@ export class UserService {
   async getMe(userId: string): Promise<User> {
     const deps = this.requireDeps();
     const user = await deps.users.findById(userId);
-    if (!user) throw new UserNotFoundError();
+    if (!user || user.deletedAt) throw new UserNotFoundError();
     if (user.lockedAt) throw new UserAccountLockedError();
     return toPublicUser(user);
+  }
+
+  /**
+   * メールアドレス変更の確定。
+   * Bearer で誰が変えるかを示し、token で新メールの所有を証明する。
+   */
+  async completeEmailChange(input: CompleteEmailChangeInput): Promise<User> {
+    const deps = this.requireDeps();
+    const existing = await deps.users.findById(input.userId);
+    if (!existing || existing.deletedAt) throw new UserNotFoundError();
+    if (existing.lockedAt) throw new UserAccountLockedError();
+    if (existing.isGuest) throw new GuestActionNotAllowedError("emailChange");
+
+    const actionToken = await resolveActionToken(deps.emailTokens, {
+      token: input.token,
+      purpose: "email-change",
+    });
+
+    const newEmail = normalizeEmail(actionToken.email);
+    const taken = await deps.users.findByEmail(newEmail);
+    if (taken && taken.id !== input.userId) {
+      throw new EmailAlreadyRegisteredError(newEmail);
+    }
+
+    const updated = await deps.users.updateEmail(input.userId, newEmail);
+    if (!updated) throw new UserNotFoundError();
+
+    await deps.users.markEmailVerified(input.userId);
+    await deps.emailTokens.markUsed(actionToken.id);
+
+    const refreshed = await deps.users.findById(input.userId);
+    if (!refreshed) throw new UserNotFoundError();
+    return toPublicUser(refreshed);
+  }
+
+  /**
+   * パスワードリセット確定（未ログイン可）。
+   * 成功後、全リフレッシュトークンを失効させる。
+   */
+  async completePasswordReset(
+    input: CompletePasswordResetInput,
+  ): Promise<void> {
+    const deps = this.requireDeps();
+    const actionToken = await resolveActionToken(deps.emailTokens, {
+      token: input.token,
+      purpose: "password-reset",
+    });
+
+    const email = normalizeEmail(actionToken.email);
+    const user =
+      (actionToken.userId
+        ? await deps.users.findById(actionToken.userId)
+        : null) ?? (await deps.users.findByEmail(email));
+
+    if (!user || user.deletedAt || user.isGuest || user.passwordHash === null) {
+      throw new InvalidCredentialsError();
+    }
+
+    const passwordHash = await hashSecret(input.newPassword);
+    const updated = await deps.users.updatePasswordHash(user.id, passwordHash);
+    if (!updated) throw new UserNotFoundError();
+
+    await deps.emailTokens.markUsed(actionToken.id);
+    await deps.refreshTokens.revokeAllForUser(user.id);
+  }
+
+  /** アカウント論理削除。リフレッシュトークンをすべて失効する */
+  async deleteAccount(input: DeleteAccountInput): Promise<void> {
+    const deps = this.requireDeps();
+    const existing = await deps.users.findById(input.userId);
+    if (!existing || existing.deletedAt) throw new UserNotFoundError();
+
+    await deps.users.softDelete(input.userId);
+    await deps.refreshTokens.revokeAllForUser(input.userId);
   }
 }

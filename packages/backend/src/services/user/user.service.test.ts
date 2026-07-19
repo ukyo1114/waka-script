@@ -4,6 +4,7 @@ import {
   buildAvatarImageUrl,
   type Avatar,
 } from "../../domain/avatar/index.js";
+import { MAX_LOGIN_ATTEMPTS } from "../../domain/user/index.js";
 import type {
   AvatarRepository,
   CreateAvatarInput,
@@ -49,6 +50,8 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -161,8 +164,70 @@ class FakeUserRepository implements UserRepository {
     return updated;
   }
 
-  async clearLock(): Promise<UserRecord | null> {
-    throw new Error("unused");
+  async updateEmail(id: string, email: string): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    if (current.email) {
+      this.users.delete(`email:${current.email}`);
+    }
+    const updated = { ...current, email, updatedAt: new Date() };
+    this.seed(updated);
+    return updated;
+  }
+
+  async clearLock(id: string): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const updated = {
+      ...current,
+      lockedAt: null,
+      loginAttempts: 0,
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
+  }
+
+  async recordFailedLogin(id: string): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const loginAttempts = current.loginAttempts + 1;
+    const lockedAt =
+      loginAttempts >= MAX_LOGIN_ATTEMPTS
+        ? current.lockedAt ?? new Date()
+        : current.lockedAt;
+    const updated = {
+      ...current,
+      loginAttempts,
+      lockedAt,
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
+  }
+
+  async resetLoginAttempts(id: string): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const updated = {
+      ...current,
+      loginAttempts: 0,
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
+  }
+
+  async softDelete(id: string): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const updated = {
+      ...current,
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
   }
 }
 
@@ -205,6 +270,7 @@ class FakeEmailTokenRepository implements EmailTokenRepository {
 }
 
 class FakeRefreshTokenRepository implements RefreshTokenRepository {
+  revokeAllCalls: string[] = [];
   created: CreateRefreshTokenInput[] = [];
   revoked: { id: string; replacedByTokenId: string | null }[] = [];
   private byId = new Map<string, RefreshToken>();
@@ -244,6 +310,7 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
     userId: string,
     revokedAt = new Date(),
   ): Promise<number> {
+    this.revokeAllCalls.push(userId);
     let count = 0;
     for (const [id, token] of this.byId) {
       if (token.userId !== userId || token.revokedAt !== null) continue;
@@ -290,6 +357,13 @@ class FakeAvatarRepository implements AvatarRepository {
     avatar.name = name;
     avatar.updatedAt = new Date();
     return avatar;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const index = this.items.findIndex((a) => a.id === id);
+    if (index < 0) return false;
+    this.items.splice(index, 1);
+    return true;
   }
 }
 
@@ -745,5 +819,109 @@ describe("UserService.loginAsGuest", () => {
     const { userService } = service();
     const result = await userService.loginAsGuest();
     assert.equal(result.user.displayName, "Guest");
+  });
+});
+
+describe("UserService.completeEmailChange", () => {
+  it("updates email with valid token", async () => {
+    const users = new FakeUserRepository();
+    users.seed(createUserRecord({ id: "user-1", email: "old@example.com" }));
+    const secret = "secret";
+    const tokenHash = await hashSecret(secret);
+    const emailTokens = new FakeEmailTokenRepository();
+    emailTokens.seed(
+      createEmailToken({
+        id: "tok-email",
+        email: "new@example.com",
+        purpose: "email-change",
+        userId: null,
+        tokenHash,
+      }),
+    );
+    const { userService } = service({ users, emailTokens });
+    const user = await userService.completeEmailChange({
+      userId: "user-1",
+      token: formatOpaqueToken("tok-email", secret),
+    });
+    assert.equal(user.email, "new@example.com");
+    assert.deepEqual(emailTokens.markUsedIds, ["tok-email"]);
+  });
+});
+
+describe("UserService.completePasswordReset", () => {
+  it("resets password and revokes refresh tokens", async () => {
+    const passwordHash = await hashSecret("old-pass");
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "a@example.com",
+        passwordHash,
+      }),
+    );
+    const secret = "secret";
+    const tokenHash = await hashSecret(secret);
+    const emailTokens = new FakeEmailTokenRepository();
+    emailTokens.seed(
+      createEmailToken({
+        id: "tok-pw",
+        email: "a@example.com",
+        purpose: "password-reset",
+        userId: "user-1",
+        tokenHash,
+      }),
+    );
+    const refreshTokens = new FakeRefreshTokenRepository();
+    const { userService } = service({ users, emailTokens, refreshTokens });
+    await userService.completePasswordReset({
+      token: formatOpaqueToken("tok-pw", secret),
+      newPassword: "new-pass",
+    });
+    const updated = await users.findById("user-1");
+    assert.ok(updated && (await verifySecret("new-pass", updated.passwordHash!)));
+    assert.equal(refreshTokens.revokeAllCalls.length, 1);
+  });
+});
+
+describe("UserService.login lock", () => {
+  it("locks after MAX_LOGIN_ATTEMPTS failures", async () => {
+    const passwordHash = await hashSecret("right");
+    const users = new FakeUserRepository();
+    users.seed(createUserRecord({ passwordHash, loginAttempts: 0 }));
+    const { userService } = service({ users });
+    for (let i = 0; i < MAX_LOGIN_ATTEMPTS - 1; i += 1) {
+      await assert.rejects(
+        () =>
+          userService.login({
+            email: "new@example.com",
+            password: "wrong",
+          }),
+        InvalidCredentialsError,
+      );
+    }
+    await assert.rejects(
+      () =>
+        userService.login({
+          email: "new@example.com",
+          password: "wrong",
+        }),
+      UserAccountLockedError,
+    );
+    const locked = await users.findById("user-1");
+    assert.ok(locked?.lockedAt);
+    assert.equal(locked?.loginAttempts, MAX_LOGIN_ATTEMPTS);
+  });
+});
+
+describe("UserService.deleteAccount", () => {
+  it("soft deletes and revokes refresh tokens", async () => {
+    const users = new FakeUserRepository();
+    users.seed(createUserRecord({ id: "user-1" }));
+    const refreshTokens = new FakeRefreshTokenRepository();
+    const { userService } = service({ users, refreshTokens });
+    await userService.deleteAccount({ userId: "user-1" });
+    const deleted = await users.findById("user-1");
+    assert.ok(deleted?.deletedAt);
+    assert.equal(refreshTokens.revokeAllCalls.length, 1);
   });
 });

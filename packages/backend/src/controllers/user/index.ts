@@ -1,5 +1,8 @@
 export {
   changePassword,
+  completeEmailChange,
+  completePasswordReset,
+  deleteAccount,
   getMe,
   login,
   loginAsGuest,

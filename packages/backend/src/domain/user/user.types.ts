@@ -10,6 +10,13 @@ export type User = {
   isGuest: boolean;
   emailVerifiedAt: Date | null;
   lockedAt: Date | null;
+  /** 連続ログイン失敗回数（成功時・ロック解除時に 0） */
+  loginAttempts: number;
+  /** 論理削除時刻。設定後はログイン不可 */
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+/** 連続ログイン失敗でロックするまでの上限 */
+export const MAX_LOGIN_ATTEMPTS = 5;
