@@ -25,7 +25,7 @@ import {
   InvalidChannelPasswordError,
   NotChannelAdminError,
 } from "../../shared/errors.js";
-import { ChannelService } from "./service.js";
+import { ChannelService } from "./channel.service.js";
 
 function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();

@@ -20,7 +20,7 @@ import {
   UserNotFoundError,
 } from "../../shared/errors.js";
 import type { ObjectStorage, PutObjectInput } from "../../shared/object-storage.js";
-import { AvatarService } from "./service.js";
+import { AvatarService } from "./avatar.service.js";
 
 const PUBLIC_BASE = "https://cdn.test";
 

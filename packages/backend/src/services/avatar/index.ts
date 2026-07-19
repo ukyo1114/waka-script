@@ -7,4 +7,4 @@ export {
   type ListAvatarsInput,
   type UpdateAvatarImageInput,
   type UpdateAvatarNameInput,
-} from "./service.js";
+} from "./avatar.service.js";

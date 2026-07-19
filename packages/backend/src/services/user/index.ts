@@ -10,4 +10,4 @@ export {
   type RegisterUserInput,
   type UpdateDisplayNameInput,
   type UserServiceDeps,
-} from "./service.js";
+} from "./user.service.js";

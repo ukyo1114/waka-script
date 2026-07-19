@@ -2,4 +2,4 @@ export {
   createRefreshTokenForUser,
   resolveRefreshToken,
   type IssuedRefreshToken,
-} from "./refresh-token.js";
+} from "./auth.refresh-token.js";

@@ -23,7 +23,7 @@ import {
   UserNotLockedError,
 } from "../../shared/errors.js";
 import { parseEmailToken } from "../../shared/random-token.js";
-import { EmailService } from "./service.js";
+import { EmailService } from "./email.service.js";
 
 function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();

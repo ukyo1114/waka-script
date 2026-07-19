@@ -35,7 +35,7 @@ import {
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { formatOpaqueToken, parseOpaqueToken } from "../../shared/random-token.js";
-import { UserService } from "./service.js";
+import { UserService } from "./user.service.js";
 
 const JWT_SECRET = "test-access-jwt-secret";
 

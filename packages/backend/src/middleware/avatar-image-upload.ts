@@ -1,6 +1,6 @@
 import multer from "multer";
 import type { NextFunction, Request, Response } from "express";
-import { AVATAR_IMAGE_MAX_BYTES } from "../services/avatar/service.js";
+import { AVATAR_IMAGE_MAX_BYTES } from "../services/avatar/avatar.service.js";
 import { InvalidAvatarImageError } from "../shared/errors.js";
 import { handleControllerError } from "../shared/http.js";
 

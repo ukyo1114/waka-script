@@ -7,4 +7,4 @@ export {
   type ListChannelsResult,
   type PublicChannel,
   type UpdateChannelInput,
-} from "./service.js";
+} from "./channel.service.js";

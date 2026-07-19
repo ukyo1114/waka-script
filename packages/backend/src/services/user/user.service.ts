@@ -20,8 +20,8 @@ import { AvatarService } from "../avatar/index.js";
 import {
   createRefreshTokenForUser,
   resolveRefreshToken,
-} from "../auth/refresh-token.js";
-import { resolveActionToken } from "../email/resolve-action-token.js";
+} from "../auth/auth.refresh-token.js";
+import { resolveActionToken } from "../email/email.resolve-action-token.js";
 
 export type RegisterUserInput = {
   /** メール認証コード検証後に発行されたアクション用トークン */

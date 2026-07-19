@@ -23,9 +23,9 @@ import {
 import {
   resolveActionToken,
   type ResolveActionTokenInput,
-} from "./resolve-action-token.js";
+} from "./email.resolve-action-token.js";
 
-export type { ResolveActionTokenInput } from "./resolve-action-token.js";
+export type { ResolveActionTokenInput } from "./email.resolve-action-token.js";
 
 export type SendVerificationCodeInput = {
   purpose: EmailPurpose;
