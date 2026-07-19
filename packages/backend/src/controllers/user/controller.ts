@@ -5,12 +5,15 @@ import {
   InvalidAccessTokenError,
   NotImplementedError,
 } from "../../shared/errors.js";
+import { handleControllerError } from "../../shared/http.js";
+import { parseWithSchema } from "../../shared/validation.js";
 import {
-  badRequest,
-  handleControllerError,
-  readString,
-  type JsonBody,
-} from "../../shared/http.js";
+  changePasswordBodySchema,
+  loginBodySchema,
+  refreshTokenBodySchema,
+  registerBodySchema,
+  updateDisplayNameBodySchema,
+} from "./schemas.js";
 
 function createUserService(req: Request): UserService {
   try {
@@ -23,21 +26,11 @@ function createUserService(req: Request): UserService {
 
 /** POST /user/register — メール認証トークン付き本登録 */
 export async function register(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const token = readString(body, "token");
-  const password = readString(body, "password");
-  const displayName = readString(body, "displayName");
-
-  if (!token) return badRequest(res, "token is required");
-  if (!password) return badRequest(res, "password is required");
-  if (!displayName) return badRequest(res, "displayName is required");
+  const parsed = parseWithSchema(registerBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
-    const user = await createUserService(req).register({
-      token,
-      password,
-      displayName,
-    });
+    const user = await createUserService(req).register(parsed.data);
     return res.status(201).json({
       id: user.id,
       email: user.email,
@@ -50,15 +43,11 @@ export async function register(req: Request, res: Response) {
 
 /** POST /user/login */
 export async function login(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const email = readString(body, "email");
-  const password = readString(body, "password");
-
-  if (!email) return badRequest(res, "email is required");
-  if (!password) return badRequest(res, "password is required");
+  const parsed = parseWithSchema(loginBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
-    const result = await createUserService(req).login({ email, password });
+    const result = await createUserService(req).login(parsed.data);
     return res.status(200).json({
       id: result.user.id,
       email: result.user.email,
@@ -73,13 +62,11 @@ export async function login(req: Request, res: Response) {
 
 /** POST /user/token/refresh */
 export async function refresh(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const refreshToken = readString(body, "refreshToken");
-
-  if (!refreshToken) return badRequest(res, "refreshToken is required");
+  const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
-    const tokens = await createUserService(req).refreshTokens({ refreshToken });
+    const tokens = await createUserService(req).refreshTokens(parsed.data);
     return res.status(200).json({
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -91,13 +78,11 @@ export async function refresh(req: Request, res: Response) {
 
 /** POST /user/logout */
 export async function logout(req: Request, res: Response) {
-  const body = (req.body ?? {}) as JsonBody;
-  const refreshToken = readString(body, "refreshToken");
-
-  if (!refreshToken) return badRequest(res, "refreshToken is required");
+  const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
-    await createUserService(req).logout({ refreshToken });
+    await createUserService(req).logout(parsed.data);
     return res.status(204).send();
   } catch (error) {
     return handleControllerError(res, error);
@@ -111,14 +96,13 @@ export async function updateDisplayName(req: Request, res: Response) {
     return handleControllerError(res, new InvalidAccessTokenError());
   }
 
-  const body = (req.body ?? {}) as JsonBody;
-  const displayName = readString(body, "displayName");
-  if (!displayName) return badRequest(res, "displayName is required");
+  const parsed = parseWithSchema(updateDisplayNameBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
     const user = await createUserService(req).updateDisplayName({
       userId,
-      displayName,
+      displayName: parsed.data.displayName,
     });
     return res.status(200).json({
       id: user.id,
@@ -137,18 +121,14 @@ export async function changePassword(req: Request, res: Response) {
     return handleControllerError(res, new InvalidAccessTokenError());
   }
 
-  const body = (req.body ?? {}) as JsonBody;
-  const currentPassword = readString(body, "currentPassword");
-  const newPassword = readString(body, "newPassword");
-
-  if (!currentPassword) return badRequest(res, "currentPassword is required");
-  if (!newPassword) return badRequest(res, "newPassword is required");
+  const parsed = parseWithSchema(changePasswordBodySchema, req.body, res);
+  if (!parsed.ok) return;
 
   try {
     await createUserService(req).changePassword({
       userId,
-      currentPassword,
-      newPassword,
+      currentPassword: parsed.data.currentPassword,
+      newPassword: parsed.data.newPassword,
     });
     return res.status(204).send();
   } catch (error) {

@@ -14,7 +14,8 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "express": "^5.1.0",
-    "jose": "^6.2.3"
+    "jose": "^6.2.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

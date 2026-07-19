@@ -1,26 +1,14 @@
 import type { Request, Response } from "express";
-import { isEmailPurpose } from "../../domain/email/index.js";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { EmailService } from "../../services/email/index.js";
 import { NotImplementedError } from "../../shared/errors.js";
+import { handleControllerError } from "../../shared/http.js";
+import { parseWithSchema } from "../../shared/validation.js";
 import {
-  badRequest,
-  handleControllerError,
-  readString,
-  type JsonBody,
-} from "../../shared/http.js";
-
-function readPurpose(req: Request, res: Response) {
-  const purpose = req.params.purpose;
-  if (typeof purpose !== "string" || !isEmailPurpose(purpose)) {
-    badRequest(
-      res,
-      "purpose must be one of: register, email-change, password-reset, unlock",
-    );
-    return null;
-  }
-  return purpose;
-}
+  emailPurposeParamSchema,
+  sendCodeBodySchema,
+  verifyCodeBodySchema,
+} from "./schemas.js";
 
 function createEmailService(req: Request): EmailService {
   try {
@@ -32,15 +20,17 @@ function createEmailService(req: Request): EmailService {
 
 /** POST /email/send/:purpose */
 export async function sendCode(req: Request, res: Response) {
-  const purpose = readPurpose(req, res);
-  if (!purpose) return;
+  const params = parseWithSchema(emailPurposeParamSchema, req.params, res);
+  if (!params.ok) return;
 
-  const body = (req.body ?? {}) as JsonBody;
-  const email = readString(body, "email");
-  if (!email) return badRequest(res, "email is required");
+  const body = parseWithSchema(sendCodeBodySchema, req.body, res);
+  if (!body.ok) return;
 
   try {
-    await createEmailService(req).sendVerificationCode({ purpose, email });
+    await createEmailService(req).sendVerificationCode({
+      purpose: params.data.purpose,
+      email: body.data.email,
+    });
     return res.status(202).json({ ok: true });
   } catch (error) {
     return handleControllerError(res, error);
@@ -49,21 +39,17 @@ export async function sendCode(req: Request, res: Response) {
 
 /** POST /email/verify/:purpose */
 export async function verifyCode(req: Request, res: Response) {
-  const purpose = readPurpose(req, res);
-  if (!purpose) return;
+  const params = parseWithSchema(emailPurposeParamSchema, req.params, res);
+  if (!params.ok) return;
 
-  const body = (req.body ?? {}) as JsonBody;
-  const email = readString(body, "email");
-  const code = readString(body, "code");
-
-  if (!email) return badRequest(res, "email is required");
-  if (!code) return badRequest(res, "code is required");
+  const body = parseWithSchema(verifyCodeBodySchema, req.body, res);
+  if (!body.ok) return;
 
   try {
     const result = await createEmailService(req).verifyCode({
-      purpose,
-      email,
-      code,
+      purpose: params.data.purpose,
+      email: body.data.email,
+      code: body.data.code,
     });
     return res.status(200).json({
       ok: true,
