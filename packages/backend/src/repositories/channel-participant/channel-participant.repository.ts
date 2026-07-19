@@ -21,6 +21,12 @@ export class ChannelParticipantRepositoryImpl
     return notImplemented();
   }
 
+  findActiveById(
+    _id: string,
+  ): Promise<ChannelParticipant | null> {
+    return notImplemented();
+  }
+
   findActiveByChannelIdAndUserId(
     _channelId: ChannelId,
     _userId: UserId,

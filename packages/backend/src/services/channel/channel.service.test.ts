@@ -178,6 +178,10 @@ class FakeChannelParticipantRepository implements ChannelParticipantRepository {
     return participant;
   }
 
+  async findActiveById(id: string): Promise<ChannelParticipant | null> {
+    return this.items.find((p) => p.id === id && p.deletedAt === null) ?? null;
+  }
+
   async findActiveByChannelIdAndUserId(
     channelId: string,
     userId: string,

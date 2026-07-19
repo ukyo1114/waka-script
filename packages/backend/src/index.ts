@@ -1,8 +1,8 @@
-import { createApp } from "./app.js";
+import { createServer } from "./server.js";
 
-const app = createApp();
+const { httpServer } = createServer();
 const port = Number(process.env.PORT) || 3000;
 
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`@jinro/backend listening on http://localhost:${port}`);
 });

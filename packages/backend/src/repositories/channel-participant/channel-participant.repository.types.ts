@@ -17,6 +17,7 @@ export type CreateChannelParticipantInput = {
 
 export interface ChannelParticipantRepository {
   create(input: CreateChannelParticipantInput): Promise<ChannelParticipant>;
+  findActiveById(id: ChannelParticipantId): Promise<ChannelParticipant | null>;
   findActiveByChannelIdAndUserId(
     channelId: ChannelId,
     userId: UserId,
