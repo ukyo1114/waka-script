@@ -23,7 +23,7 @@ import {
   UserNotLockedError,
 } from "../../shared/errors.js";
 import { parseEmailToken } from "../../shared/random-token.js";
-import { EmailService } from "./service.js";
+import { EmailService } from "./email.service.js";
 
 function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
   const now = new Date();
@@ -32,8 +32,11 @@ function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
     email: "user@example.com",
     passwordHash: "hash",
     displayName: "User",
+    isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
+    loginAttempts: 0,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -91,10 +94,32 @@ class FakeUserRepository implements UserRepository {
   async updatePasswordHash(): Promise<UserRecord | null> {
     return this.user;
   }
+  async updateDisplayName(
+    id: string,
+    displayName: string,
+  ): Promise<UserRecord | null> {
+    if (!this.user || this.user.id !== id) return null;
+    this.user = { ...this.user, displayName };
+    return this.user;
+  }
+  async updateEmail(id: string, email: string): Promise<UserRecord | null> {
+    if (!this.user || this.user.id !== id) return null;
+    this.user = { ...this.user, email };
+    return this.user;
+  }
   async clearLock(id: string): Promise<UserRecord | null> {
     this.clearLockCalls.push(id);
     if (!this.user || this.user.id !== id) return null;
-    this.user = { ...this.user, lockedAt: null };
+    this.user = { ...this.user, lockedAt: null, loginAttempts: 0 };
+    return this.user;
+  }
+  async recordFailedLogin(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async resetLoginAttempts(): Promise<UserRecord | null> {
+    return this.user;
+  }
+  async softDelete(): Promise<UserRecord | null> {
     return this.user;
   }
 }
@@ -405,6 +430,7 @@ describe("EmailService.verifyCode", () => {
   it("password-reset: 検証成功したらトークンに userId を紐づける", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
     const user = createUser();
+    assert.ok(user.email);
     const codeHash = await hashSecret("654321");
     const latest = createEmailCode({
       email: user.email,
@@ -431,6 +457,7 @@ describe("EmailService.verifyCode", () => {
   it("unlock: 検証成功したらロック解除しトークンは返さない", async () => {
     const { hashSecret } = await import("../../shared/hash.js");
     const user = createUser({ lockedAt: new Date() });
+    assert.ok(user.email);
     const codeHash = await hashSecret("111111");
     const latest = createEmailCode({
       email: user.email,

@@ -1,1 +1,1 @@
-export { sendCode, verifyCode } from "./controller.js";
+export { sendCode, verifyCode } from "./email.controller.js";

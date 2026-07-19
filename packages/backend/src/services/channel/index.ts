@@ -1,0 +1,17 @@
+export {
+  ChannelService,
+  type BlockChannelUserInput,
+  type ChannelServiceDeps,
+  type CreateChannelInput,
+  type DeleteChannelInput,
+  type GetChannelInput,
+  type JoinChannelInput,
+  type LeaveChannelInput,
+  type ListBlockedUsersInput,
+  type ListChannelsInput,
+  type ListChannelsResult,
+  type PublicBlockedUser,
+  type PublicChannel,
+  type UnblockChannelUserInput,
+  type UpdateChannelInput,
+} from "./channel.service.js";

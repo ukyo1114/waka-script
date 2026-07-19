@@ -169,5 +169,7 @@ sequenceDiagram
 - ハッシュ / 照合: `shared/hashSecret` / `shared/verifySecret`（bcrypt）
   - 一方向ハッシュのため復号は不可。照合のみ行う
   - 認証コード・パスワード・アクション用トークンで共通利用する想定
-- 後続 API でのトークン検証: `EmailService.resolveActionToken`（使用済み化は呼び出し側で `emailTokens.markUsed`）
-- `email-change` の「ログイン必須」は今後ミドルウェアで担保する
+- 後続 API でのトークン検証: `resolveActionToken`（使用済み化は呼び出し側で `emailTokens.markUsed`）
+- 本登録: `POST /user/register`（詳細は `docs/user.md`）
+- メール変更確定: `PATCH /user/email`（Bearer + `email-change` token）
+- パスワード再設定: `POST /user/password-reset`（`password-reset` token）
