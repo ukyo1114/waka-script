@@ -1,14 +1,17 @@
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { GameLogType, type GameActionType } from "../../domain/game/index.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { GameActionService } from "../../services/game/index.js";
 import {
   InvalidAccessTokenError,
   NotImplementedError,
 } from "../../shared/errors.js";
-import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
-import { gameActionBodySchema, gameIdParamsSchema } from "./game.controller.schemas.js";
+import {
+  gameActionBodySchema,
+  gameIdParamsSchema,
+} from "./game.controller.schemas.js";
 
 function createGameActionService(req: Request): GameActionService {
   try {
@@ -19,12 +22,9 @@ function createGameActionService(req: Request): GameActionService {
   }
 }
 
-function requireUserId(req: Request, res: Response): string | null {
+function requireUserId(req: Request): string {
   const userId = req.auth?.userId;
-  if (!userId) {
-    handleControllerError(res, new InvalidAccessTokenError());
-    return null;
-  }
+  if (!userId) throw new InvalidAccessTokenError();
   return userId;
 }
 
@@ -33,28 +33,22 @@ function requireUserId(req: Request, res: Response): string | null {
  * POST /game/:id/vote | divination | attack | guard で使用。
  */
 function handleActionRequest(actionType: GameActionType) {
-  return async (req: Request, res: Response) => {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
-
+  return asyncHandler(async (req, res) => {
+    const userId = requireUserId(req);
     const params = parseWithSchema(gameIdParamsSchema, req.params, res);
     if (!params.ok) return;
     const body = parseWithSchema(gameActionBodySchema, req.body, res);
     if (!body.ok) return;
 
-    try {
-      await createGameActionService(req).receive({
-        gameId: params.data.id,
-        playerId: body.data.playerId,
-        targetId: body.data.targetId,
-        userId,
-        actionType,
-      });
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      return handleControllerError(res, error);
-    }
-  };
+    await createGameActionService(req).receive({
+      gameId: params.data.id,
+      playerId: body.data.playerId,
+      targetId: body.data.targetId,
+      userId,
+      actionType,
+    });
+    return res.status(200).json({ ok: true });
+  });
 }
 
 /** POST /game/:id/vote */

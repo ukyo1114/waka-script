@@ -1,11 +1,11 @@
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { getRepositories } from "../../repositories/get-repositories.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 import { UserService } from "../../services/user/index.js";
 import {
   InvalidAccessTokenError,
   NotImplementedError,
 } from "../../shared/errors.js";
-import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
   changePasswordBodySchema,
@@ -27,193 +27,147 @@ function createUserService(req: Request): UserService {
   }
 }
 
+function requireUserId(req: Request): string {
+  const userId = req.auth?.userId;
+  if (!userId) throw new InvalidAccessTokenError();
+  return userId;
+}
+
 /** POST /user/register — メール認証トークン付き本登録 */
-export async function register(req: Request, res: Response) {
+export const register = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(registerBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const user = await createUserService(req).register(parsed.data);
-    return res.status(201).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      isGuest: user.isGuest,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const user = await createUserService(req).register(parsed.data);
+  return res.status(201).json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    isGuest: user.isGuest,
+  });
+});
 
 /** POST /user/login */
-export async function login(req: Request, res: Response) {
+export const login = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(loginBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const result = await createUserService(req).login(parsed.data);
-    return res.status(200).json({
-      id: result.user.id,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      isGuest: result.user.isGuest,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const result = await createUserService(req).login(parsed.data);
+  return res.status(200).json({
+    id: result.user.id,
+    email: result.user.email,
+    displayName: result.user.displayName,
+    isGuest: result.user.isGuest,
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+  });
+});
 
 /** POST /user/guest — ゲストとして作成しトークンを発行 */
-export async function loginAsGuest(req: Request, res: Response) {
+export const loginAsGuest = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(guestLoginBodySchema, req.body ?? {}, res);
   if (!parsed.ok) return;
 
-  try {
-    const result = await createUserService(req).loginAsGuest(parsed.data);
-    return res.status(201).json({
-      id: result.user.id,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      isGuest: result.user.isGuest,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const result = await createUserService(req).loginAsGuest(parsed.data);
+  return res.status(201).json({
+    id: result.user.id,
+    email: result.user.email,
+    displayName: result.user.displayName,
+    isGuest: result.user.isGuest,
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+  });
+});
 
 /** POST /user/token/refresh */
-export async function refresh(req: Request, res: Response) {
+export const refresh = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const tokens = await createUserService(req).refreshTokens(parsed.data);
-    return res.status(200).json({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const tokens = await createUserService(req).refreshTokens(parsed.data);
+  return res.status(200).json({
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
+});
 
 /** POST /user/logout */
-export async function logout(req: Request, res: Response) {
+export const logout = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    await createUserService(req).logout(parsed.data);
-    return res.status(204).send();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  await createUserService(req).logout(parsed.data);
+  return res.status(204).send();
+});
 
 /** PATCH /user/display-name — 表示名変更（要 access token） */
-export async function updateDisplayName(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return handleControllerError(res, new InvalidAccessTokenError());
-  }
-
+export const updateDisplayName = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const parsed = parseWithSchema(updateDisplayNameBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const user = await createUserService(req).updateDisplayName({
-      userId,
-      displayName: parsed.data.displayName,
-    });
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      isGuest: user.isGuest,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const user = await createUserService(req).updateDisplayName({
+    userId,
+    displayName: parsed.data.displayName,
+  });
+  return res.status(200).json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    isGuest: user.isGuest,
+  });
+});
 
 /** PATCH /user/password — パスワード変更（要 access token） */
-export async function changePassword(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return handleControllerError(res, new InvalidAccessTokenError());
-  }
-
+export const changePassword = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const parsed = parseWithSchema(changePasswordBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    await createUserService(req).changePassword({
-      userId,
-      currentPassword: parsed.data.currentPassword,
-      newPassword: parsed.data.newPassword,
-    });
-    return res.status(204).send();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  await createUserService(req).changePassword({
+    userId,
+    currentPassword: parsed.data.currentPassword,
+    newPassword: parsed.data.newPassword,
+  });
+  return res.status(204).send();
+});
 
 /** GET /user/me — 自分の公開プロフィール（要 access token） */
-export async function getMe(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return handleControllerError(res, new InvalidAccessTokenError());
-  }
-
-  try {
-    const user = await createUserService(req).getMe(userId);
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      isGuest: user.isGuest,
-      emailVerifiedAt: user.emailVerifiedAt,
-      lockedAt: user.lockedAt,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+export const getMe = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
+  const user = await createUserService(req).getMe(userId);
+  return res.status(200).json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    isGuest: user.isGuest,
+    emailVerifiedAt: user.emailVerifiedAt,
+    lockedAt: user.lockedAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  });
+});
 
 /** PATCH /user/email — メール変更確定（要 access token + email-change token） */
-export async function completeEmailChange(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return handleControllerError(res, new InvalidAccessTokenError());
-  }
-
+export const completeEmailChange = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const parsed = parseWithSchema(completeEmailChangeBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const user = await createUserService(req).completeEmailChange({
-      userId,
-      token: parsed.data.token,
-    });
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      isGuest: user.isGuest,
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const user = await createUserService(req).completeEmailChange({
+    userId,
+    token: parsed.data.token,
+  });
+  return res.status(200).json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    isGuest: user.isGuest,
+  });
+});
 
 /** POST /user/password-reset — パスワードリセット確定（未ログイン可） */
-export async function completePasswordReset(req: Request, res: Response) {
+export const completePasswordReset = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(
     completePasswordResetBodySchema,
     req.body,
@@ -221,25 +175,13 @@ export async function completePasswordReset(req: Request, res: Response) {
   );
   if (!parsed.ok) return;
 
-  try {
-    await createUserService(req).completePasswordReset(parsed.data);
-    return res.status(204).send();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  await createUserService(req).completePasswordReset(parsed.data);
+  return res.status(204).send();
+});
 
 /** DELETE /user/account — アカウント論理削除（要 access token） */
-export async function deleteAccount(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return handleControllerError(res, new InvalidAccessTokenError());
-  }
-
-  try {
-    await createUserService(req).deleteAccount({ userId });
-    return res.status(204).send();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+export const deleteAccount = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
+  await createUserService(req).deleteAccount({ userId });
+  return res.status(204).send();
+});
