@@ -44,6 +44,7 @@ export {
   BlockedUserNotFoundError,
   AlreadyBlockedError,
   CannotBlockChannelAdminError,
+  EntryProcessingError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";

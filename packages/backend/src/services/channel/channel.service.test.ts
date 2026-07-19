@@ -128,6 +128,7 @@ class FakeChannelRepository implements ChannelRepository {
       description: input.description,
       settings: input.settings,
       gameSettings: input.gameSettings,
+      entryProcessing: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -155,6 +156,18 @@ class FakeChannelRepository implements ChannelRepository {
     if (input.gameSettings !== undefined) channel.gameSettings = input.gameSettings;
     channel.updatedAt = new Date();
     return channel;
+  }
+
+  async acquireEntryProcessingLock(id: string): Promise<Channel | null> {
+    const channel = await this.findById(id);
+    if (!channel || channel.entryProcessing) return null;
+    channel.entryProcessing = true;
+    return channel;
+  }
+
+  async releaseEntryProcessingLock(id: string): Promise<void> {
+    const channel = await this.findById(id);
+    if (channel) channel.entryProcessing = false;
   }
 }
 

@@ -32,4 +32,10 @@ export interface ChannelRepository {
   /** 未削除チャンネルを新しい順 */
   listActive(): Promise<Channel[]>;
   update(id: ChannelId, input: UpdateChannelInput): Promise<Channel | null>;
+  /**
+   * entryProcessing が false のときだけ true にしてチャンネルを返す。
+   * 既に処理中なら null。
+   */
+  acquireEntryProcessingLock(id: ChannelId): Promise<Channel | null>;
+  releaseEntryProcessingLock(id: ChannelId): Promise<void>;
 }

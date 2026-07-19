@@ -27,6 +27,8 @@ export {
   assertPasswordProvidedIfProtected,
   buildGameSettings,
   ensureChannelExists,
+  getCountToStartGame,
+  isCountReachedToStartGame,
   isPasswordProtected,
   mergeGameSettings,
   resolveSettingsForCreate,

@@ -1,11 +1,18 @@
 import type { Server, Socket } from "socket.io";
+import type { EventBus } from "../events/index.js";
 import type { Repositories } from "../repositories/index.js";
 import { resolveSocketChannelAuth } from "./socket.auth.js";
+import { registerEntryHandlers } from "./socket.entry.js";
 import type { SocketChannelContext } from "./socket.types.js";
 
 export type SocketAuthMiddlewareDeps = {
   getRepos: () => Repositories | undefined;
   jwtSecret?: string;
+};
+
+export type SocketConnectionHandlerDeps = {
+  getRepos: () => Repositories | undefined;
+  eventBus: EventBus;
 };
 
 /** Socket.IO 用認証ミドルウェア（接続前） */
@@ -37,8 +44,11 @@ export function createSocketAuthMiddleware(deps: SocketAuthMiddlewareDeps) {
   };
 }
 
-/** 接続後: チャンネルルームへ join（Redis 不要・単一インスタンス） */
-export function registerSocketConnectionHandlers(io: Server): void {
+/** 接続後: チャンネルルームへ join + エントリーハンドラ */
+export function registerSocketConnectionHandlers(
+  io: Server,
+  deps: SocketConnectionHandlerDeps,
+): void {
   io.on("connection", (socket: Socket) => {
     const { channelId, userId, participantId } =
       socket.data as SocketChannelContext;
@@ -57,6 +67,11 @@ export function registerSocketConnectionHandlers(io: Server): void {
       channelId,
       participantId,
       userId,
+    });
+
+    registerEntryHandlers(io, socket, {
+      getRepos: deps.getRepos,
+      eventBus: deps.eventBus,
     });
   });
 }

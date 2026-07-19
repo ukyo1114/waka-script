@@ -35,6 +35,7 @@ function channel(overrides: Partial<Channel> = {}): Channel {
       guestAllowed: true,
     },
     gameSettings: buildGameSettings(),
+    entryProcessing: false,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -166,5 +167,17 @@ describe("buildGameSettings", () => {
     const gs = buildGameSettings({ roles: { VILLAGER: 4 } });
     assert.equal(gs.roles.VILLAGER, 4);
     assert.equal(gs.phaseDurations[GamePhase.DAY], 10);
+  });
+});
+
+describe("getCountToStartGame / isCountReachedToStartGame", () => {
+  it("roles 合計と到達判定", async () => {
+    const { getCountToStartGame, isCountReachedToStartGame } = await import(
+      "./index.js"
+    );
+    const gs = buildGameSettings({ roles: { VILLAGER: 2, WEREWOLF: 1 } });
+    assert.equal(getCountToStartGame(gs), 3);
+    assert.equal(isCountReachedToStartGame(gs, 3), true);
+    assert.equal(isCountReachedToStartGame(gs, 2), false);
   });
 });

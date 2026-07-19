@@ -10,4 +10,6 @@ export {
   createSocketAuthMiddleware,
   registerSocketConnectionHandlers,
   type SocketAuthMiddlewareDeps,
+  type SocketConnectionHandlerDeps,
 } from "./socket.connection.js";
+export { registerEntryHandlers, type EntryHandlersDeps } from "./socket.entry.js";

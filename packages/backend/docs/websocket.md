@@ -38,14 +38,14 @@ socket.on("socket:ready", (payload) => {
 
 成功時: `socket.data = { userId, channelId, participantId }` のあと `socket.join(channelId)`。
 
-### サーバー → クライアント（骨格）
+### サーバー → クライアント
 
 | イベント | とき |
 |----------|------|
 | `socket:ready` | ルーム参加完了 |
+| `entry:updated` | エントリー一覧更新（詳細は `docs/entry.md`） |
+| `entry:error` | エントリー操作失敗 |
 | `error` | コンテキスト欠損など（切断） |
-
-チャンネル更新・入室・ブロックなどの業務イベント配線は未実装（次の段階）。
 
 ## 起動
 

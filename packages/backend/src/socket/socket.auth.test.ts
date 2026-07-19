@@ -33,6 +33,7 @@ class FakeChannelRepository implements ChannelRepository {
       description: input.description,
       settings: input.settings,
       gameSettings: input.gameSettings,
+      entryProcessing: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -52,6 +53,12 @@ class FakeChannelRepository implements ChannelRepository {
   async update(_id: string, _input: UpdateChannelInput): Promise<Channel | null> {
     return null;
   }
+
+  async acquireEntryProcessingLock(_id: string): Promise<Channel | null> {
+    return null;
+  }
+
+  async releaseEntryProcessingLock(_id: string): Promise<void> {}
 }
 
 class FakeChannelParticipantRepository implements ChannelParticipantRepository {
@@ -120,6 +127,7 @@ describe("resolveSocketChannelAuth", () => {
           POST_GAME: 10,
         },
       },
+      entryProcessing: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -190,6 +198,7 @@ describe("resolveSocketChannelAuth", () => {
           POST_GAME: 10,
         },
       },
+      entryProcessing: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -245,6 +254,7 @@ describe("resolveSocketChannelAuth", () => {
           POST_GAME: 10,
         },
       },
+      entryProcessing: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: new Date(),

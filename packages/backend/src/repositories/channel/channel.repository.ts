@@ -27,4 +27,12 @@ export class ChannelRepositoryImpl implements ChannelRepository {
   update(_id: ChannelId, _input: UpdateChannelInput): Promise<Channel | null> {
     return notImplemented();
   }
+
+  acquireEntryProcessingLock(_id: ChannelId): Promise<Channel | null> {
+    return notImplemented();
+  }
+
+  releaseEntryProcessingLock(_id: ChannelId): Promise<void> {
+    return notImplemented();
+  }
 }

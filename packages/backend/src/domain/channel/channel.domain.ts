@@ -177,3 +177,13 @@ export const assertJoinAllowed = (
   assertPasswordProvidedIfProtected(existing.settings, password);
   return existing;
 };
+
+/** gameSettings.roles の合計＝ゲーム開始人数 */
+export const getCountToStartGame = (gameSettings: GameSettings): number =>
+  Object.values(gameSettings.roles).reduce((acc, n) => acc + n, 0);
+
+/** エントリー人数が開始人数に達していれば true（厳密一致） */
+export const isCountReachedToStartGame = (
+  gameSettings: GameSettings,
+  activeEntryCount: number,
+): boolean => activeEntryCount === getCountToStartGame(gameSettings);

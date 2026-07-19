@@ -226,3 +226,14 @@ export class CannotBlockChannelAdminError extends AppError {
     this.name = "CannotBlockChannelAdminError";
   }
 }
+
+export class EntryProcessingError extends AppError {
+  constructor() {
+    super(
+      409,
+      "entry_processing",
+      "channel entry is being processed; try again",
+    );
+    this.name = "EntryProcessingError";
+  }
+}

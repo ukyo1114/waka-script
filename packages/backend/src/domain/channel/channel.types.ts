@@ -46,6 +46,7 @@ export type Channel = {
   description: string;
   settings: ChannelSettings;
   gameSettings: GameSettings;
+  entryProcessing: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
