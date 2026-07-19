@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { EventBus } from "../../events/index.js";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { ChannelService } from "../../services/channel/index.js";
 import {
@@ -20,12 +21,14 @@ function createChannelService(req: Request): ChannelService {
   try {
     const { users, avatars, channels, channelParticipants, blockedUsers } =
       getRepositories(req);
+    const eventBus = req.app.locals.eventBus as EventBus | undefined;
     return new ChannelService({
       users,
       avatars,
       channels,
       channelParticipants,
       blockedUsers,
+      eventBus,
     });
   } catch {
     throw new NotImplementedError("channel.repositories");
@@ -72,6 +75,25 @@ export async function listChannels(req: Request, res: Response) {
   try {
     const result = await createChannelService(req).list({ userId });
     return res.status(200).json(result);
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** GET /channel/:id — 詳細 */
+export async function getChannel(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(channelIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    const channel = await createChannelService(req).get({
+      userId,
+      channelId: params.data.id,
+    });
+    return res.status(200).json(channel);
   } catch (error) {
     return handleControllerError(res, error);
   }
@@ -189,6 +211,44 @@ export async function unblockChannelUser(req: Request, res: Response) {
       blockedUserId: params.data.blockedUserId,
     });
     return res.status(200).json({ ok: true });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** POST /channel/:id/leave — 退出（管理者不可） */
+export async function leaveChannel(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(channelIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    await createChannelService(req).leave({
+      userId,
+      channelId: params.data.id,
+    });
+    return res.status(204).send();
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** DELETE /channel/:id — 論理削除（管理者） */
+export async function deleteChannel(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const params = parseWithSchema(channelIdParamsSchema, req.params, res);
+  if (!params.ok) return;
+
+  try {
+    await createChannelService(req).delete({
+      userId,
+      channelId: params.data.id,
+    });
+    return res.status(204).send();
   } catch (error) {
     return handleControllerError(res, error);
   }

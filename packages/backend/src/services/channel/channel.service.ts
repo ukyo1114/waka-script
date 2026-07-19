@@ -8,6 +8,7 @@ import {
 } from "../../domain/blocked-user/index.js";
 import {
   assertChannelAdmin,
+  assertChannelAdminCannotLeave,
   assertGuestCanCreateChannel,
   assertJoinAllowed,
   buildGameSettings,
@@ -23,6 +24,12 @@ import {
   type PublicChannelSettings,
   type SettingsInput,
 } from "../../domain/channel/index.js";
+import type { EventBus } from "../../events/index.js";
+import {
+  channelDeletedEvent,
+  channelParticipantJoinedEvent,
+  channelParticipantLeftEvent,
+} from "../../events/index.js";
 import type { AvatarRepository } from "../../repositories/avatar/index.js";
 import type { BlockedUserRepository } from "../../repositories/blocked-user/index.js";
 import type { ChannelParticipantRepository } from "../../repositories/channel-participant/index.js";
@@ -31,6 +38,7 @@ import type { UserRepository } from "../../repositories/user/index.js";
 import {
   AvatarNotFoundError,
   BlockedUserNotFoundError,
+  ChannelNotFoundError,
   ChannelParticipantNotFoundError,
   InvalidChannelPasswordError,
   NotImplementedError,
@@ -92,6 +100,21 @@ export type ListBlockedUsersInput = {
   channelId: string;
 };
 
+export type GetChannelInput = {
+  userId: string;
+  channelId: string;
+};
+
+export type LeaveChannelInput = {
+  userId: string;
+  channelId: string;
+};
+
+export type DeleteChannelInput = {
+  userId: string;
+  channelId: string;
+};
+
 export type PublicBlockedUser = {
   id: string;
   channelId: string;
@@ -117,6 +140,8 @@ export type ChannelServiceDeps = {
   channels: ChannelRepository;
   channelParticipants: ChannelParticipantRepository;
   blockedUsers: BlockedUserRepository;
+  /** 省略可。指定時は join / leave / delete で EventBus に配信する */
+  eventBus?: EventBus;
 };
 
 /**
@@ -257,12 +282,68 @@ export class ChannelService {
       );
     if (existing) return existing;
 
-    return deps.channelParticipants.create({
+    const participant = await deps.channelParticipants.create({
       id: randomUUID(),
       channelId: channel.id,
       userId: input.userId,
       avatarId: input.avatarId,
     });
+
+    deps.eventBus?.emit(
+      channelParticipantJoinedEvent({
+        channelId: channel.id,
+        participant,
+      }),
+    );
+
+    return participant;
+  }
+
+  async get(input: GetChannelInput): Promise<PublicChannel> {
+    await this.requireActiveUser(input.userId);
+    const channel = ensureChannelExists(
+      await this.requireDeps().channels.findById(input.channelId),
+    );
+    return this.toPublic(channel);
+  }
+
+  async leave(input: LeaveChannelInput): Promise<void> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+
+    const channel = ensureChannelExists(
+      await deps.channels.findById(input.channelId),
+    );
+    assertChannelAdminCannotLeave(channel.adminUserId, input.userId);
+
+    const removed =
+      await deps.channelParticipants.softDeleteByChannelIdAndUserId(
+        channel.id,
+        input.userId,
+      );
+    if (!removed) throw new ChannelParticipantNotFoundError();
+
+    deps.eventBus?.emit(
+      channelParticipantLeftEvent({
+        channelId: channel.id,
+        userId: input.userId,
+        participantId: removed.id,
+      }),
+    );
+  }
+
+  async delete(input: DeleteChannelInput): Promise<void> {
+    const deps = this.requireDeps();
+    await this.requireActiveUser(input.userId);
+    const channel = await this.requireAdminChannel(
+      input.userId,
+      input.channelId,
+    );
+
+    const deleted = await deps.channels.softDelete(channel.id);
+    if (!deleted) throw new ChannelNotFoundError();
+
+    deps.eventBus?.emit(channelDeletedEvent(channel.id));
   }
 
   async update(input: UpdateChannelInput): Promise<PublicChannel> {

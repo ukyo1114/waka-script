@@ -51,4 +51,11 @@ export class ChannelParticipantRepositoryImpl
   ): Promise<ChannelParticipant | null> {
     return notImplemented();
   }
+
+  softDeleteByChannelIdAndUserId(
+    _channelId: ChannelId,
+    _userId: UserId,
+  ): Promise<ChannelParticipant | null> {
+    return notImplemented();
+  }
 }

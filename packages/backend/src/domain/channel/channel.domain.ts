@@ -1,4 +1,5 @@
 import {
+  ChannelAdminCannotLeaveError,
   ChannelGuestNotAllowedError,
   ChannelNotFoundError,
   ChannelPasswordRequiredError,
@@ -164,6 +165,16 @@ export const assertChannelAdmin = (
 ): void => {
   if (adminUserId !== requesterUserId) {
     throw new NotChannelAdminError();
+  }
+};
+
+/** 管理者は退出不可（チャンネル削除を使う） */
+export const assertChannelAdminCannotLeave = (
+  adminUserId: UserId,
+  requesterUserId: UserId,
+): void => {
+  if (adminUserId === requesterUserId) {
+    throw new ChannelAdminCannotLeaveError();
   }
 };
 

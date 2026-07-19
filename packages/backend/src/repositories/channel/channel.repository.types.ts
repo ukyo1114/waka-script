@@ -38,4 +38,6 @@ export interface ChannelRepository {
    */
   acquireEntryProcessingLock(id: ChannelId): Promise<Channel | null>;
   releaseEntryProcessingLock(id: ChannelId): Promise<void>;
+  /** 論理削除（deletedAt を設定） */
+  softDelete(id: ChannelId): Promise<Channel | null>;
 }

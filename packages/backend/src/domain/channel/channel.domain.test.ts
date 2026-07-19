@@ -5,8 +5,11 @@ import {
   assertGuestCanCreateChannel,
   assertJoinAllowed,
   assertChannelAdmin,
+  assertChannelAdminCannotLeave,
   buildGameSettings,
   ensureChannelExists,
+  getCountToStartGame,
+  isCountReachedToStartGame,
   isPasswordProtected,
   resolveSettingsForCreate,
   resolveSettingsForUpdate,
@@ -14,6 +17,7 @@ import {
   type Channel,
 } from "./index.js";
 import {
+  ChannelAdminCannotLeaveError,
   ChannelGuestNotAllowedError,
   ChannelNotFoundError,
   ChannelPasswordRequiredError,
@@ -158,6 +162,21 @@ describe("assertChannelAdmin / ensureChannelExists", () => {
     assert.throws(
       () => ensureChannelExists(channel({ deletedAt: new Date() })),
       ChannelNotFoundError,
+    );
+  });
+});
+
+describe("assertChannelAdminCannotLeave", () => {
+  it("管理者は退出拒否", () => {
+    assert.throws(
+      () => assertChannelAdminCannotLeave("admin", "admin"),
+      ChannelAdminCannotLeaveError,
+    );
+  });
+
+  it("一般参加者は通す", () => {
+    assert.doesNotThrow(() =>
+      assertChannelAdminCannotLeave("admin", "member"),
     );
   });
 });

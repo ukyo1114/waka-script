@@ -89,6 +89,13 @@ class FakeChannelRepository implements ChannelRepository {
     const channel = await this.findById(id);
     if (channel) channel.entryProcessing = false;
   }
+
+  async softDelete(id: string): Promise<Channel | null> {
+    const channel = await this.findById(id);
+    if (!channel) return null;
+    channel.deletedAt = new Date();
+    return channel;
+  }
 }
 
 class FakeChannelParticipantRepository implements ChannelParticipantRepository {
@@ -128,6 +135,10 @@ class FakeChannelParticipantRepository implements ChannelParticipantRepository {
   }
 
   async softDeleteByChannelIdAndAvatarId(): Promise<ChannelParticipant | null> {
+    return null;
+  }
+
+  async softDeleteByChannelIdAndUserId(): Promise<ChannelParticipant | null> {
     return null;
   }
 }

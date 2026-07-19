@@ -59,6 +59,10 @@ class FakeChannelRepository implements ChannelRepository {
   }
 
   async releaseEntryProcessingLock(_id: string): Promise<void> {}
+
+  async softDelete(): Promise<Channel | null> {
+    return null;
+  }
 }
 
 class FakeChannelParticipantRepository implements ChannelParticipantRepository {
@@ -98,6 +102,10 @@ class FakeChannelParticipantRepository implements ChannelParticipantRepository {
   }
 
   async softDeleteByChannelIdAndAvatarId(): Promise<ChannelParticipant | null> {
+    return null;
+  }
+
+  async softDeleteByChannelIdAndUserId(): Promise<ChannelParticipant | null> {
     return null;
   }
 }

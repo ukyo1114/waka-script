@@ -35,4 +35,8 @@ export class ChannelRepositoryImpl implements ChannelRepository {
   releaseEntryProcessingLock(_id: ChannelId): Promise<void> {
     return notImplemented();
   }
+
+  softDelete(_id: ChannelId): Promise<Channel | null> {
+    return notImplemented();
+  }
 }

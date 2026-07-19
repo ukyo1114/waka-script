@@ -44,15 +44,15 @@ export function createServer(
   registerSocketConnectionHandlers(io, { getRepos, eventBus });
 
   eventBus.on((event) => {
-    if (event.type === "entry:updated") {
-      io.to(event.roomId).emit(event.type, {
-        type: event.type,
-        roomId: event.roomId,
-        timestamp: event.timestamp.toISOString(),
-        data: event.data,
-      });
-    }
+    io.to(event.roomId).emit(event.type, {
+      type: event.type,
+      roomId: event.roomId,
+      timestamp: event.timestamp.toISOString(),
+      data: event.data,
+    });
   });
+
+  app.locals.eventBus = eventBus;
 
   return { app, httpServer, io, eventBus };
 }

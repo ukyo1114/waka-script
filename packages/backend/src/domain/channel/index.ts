@@ -21,6 +21,7 @@ export {
 export type { GamePhase as GamePhaseType } from "./channel.types.js";
 export {
   assertChannelAdmin,
+  assertChannelAdminCannotLeave,
   assertGuestAllowed,
   assertGuestCanCreateChannel,
   assertJoinAllowed,

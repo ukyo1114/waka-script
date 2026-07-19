@@ -32,4 +32,9 @@ export interface ChannelParticipantRepository {
     channelId: ChannelId,
     avatarId: AvatarId,
   ): Promise<ChannelParticipant | null>;
+  /** ユーザー単位の退出 */
+  softDeleteByChannelIdAndUserId(
+    channelId: ChannelId,
+    userId: UserId,
+  ): Promise<ChannelParticipant | null>;
 }

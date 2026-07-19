@@ -238,6 +238,17 @@ export class CannotBlockChannelAdminError extends AppError {
   }
 }
 
+export class ChannelAdminCannotLeaveError extends AppError {
+  constructor() {
+    super(
+      403,
+      "channel_admin_cannot_leave",
+      "channel admin cannot leave; delete the channel instead",
+    );
+    this.name = "ChannelAdminCannotLeaveError";
+  }
+}
+
 export class EntryProcessingError extends AppError {
   constructor() {
     super(

@@ -27,7 +27,9 @@ import type {
 import {
   AlreadyBlockedError,
   CannotBlockChannelAdminError,
+  ChannelAdminCannotLeaveError,
   ChannelGuestNotAllowedError,
+  ChannelNotFoundError,
   ChannelUserBlockedError,
   GuestActionNotAllowedError,
   InvalidChannelPasswordError,
@@ -41,7 +43,7 @@ function createUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     id: "user-1",
     email: "user@example.com",
     passwordHash: "hash",
-    displayName: "太郎",
+    displayName: "??",
     isGuest: false,
     emailVerifiedAt: null,
     lockedAt: null,
@@ -186,6 +188,14 @@ class FakeChannelRepository implements ChannelRepository {
     const channel = await this.findById(id);
     if (channel) channel.entryProcessing = false;
   }
+
+  async softDelete(id: string): Promise<Channel | null> {
+    const channel = await this.findById(id);
+    if (!channel) return null;
+    channel.deletedAt = new Date();
+    channel.updatedAt = new Date();
+    return channel;
+  }
 }
 
 class FakeChannelParticipantRepository implements ChannelParticipantRepository {
@@ -253,6 +263,20 @@ class FakeChannelParticipantRepository implements ChannelParticipantRepository {
     const participant = await this.findActiveByChannelIdAndAvatarId(
       channelId,
       avatarId,
+    );
+    if (!participant) return null;
+    participant.deletedAt = new Date();
+    participant.updatedAt = new Date();
+    return participant;
+  }
+
+  async softDeleteByChannelIdAndUserId(
+    channelId: string,
+    userId: string,
+  ): Promise<ChannelParticipant | null> {
+    const participant = await this.findActiveByChannelIdAndUserId(
+      channelId,
+      userId,
     );
     if (!participant) return null;
     participant.deletedAt = new Date();
@@ -360,22 +384,22 @@ function setup(users: UserRecord[] = [createUserRecord()]) {
 }
 
 describe("ChannelService.create", () => {
-  it("チャンネルを作成し管理者を参加者にする", async () => {
+  it("???????????????????", async () => {
     const { channelService, channelParticipants } = setup();
     const channel = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
       gameSettings: { roles: { VILLAGER: 3 } },
     });
-    assert.equal(channel.title, "村A");
+    assert.equal(channel.title, "?A");
     assert.equal(channel.settings.passwordEnabled, false);
     assert.equal(channel.gameSettings.roles.VILLAGER, 3);
     assert.equal(channelParticipants.items.length, 1);
     assert.equal(channelParticipants.items[0]?.channelId, channel.id);
   });
 
-  it("ゲストは作成できない", async () => {
+  it("??????????", async () => {
     const { channelService } = setup([
       createUserRecord({
         isGuest: true,
@@ -396,12 +420,12 @@ describe("ChannelService.create", () => {
 });
 
 describe("ChannelService.list", () => {
-  it("一覧と参加中・ブロック中 ID を返す", async () => {
+  it("???????????? ID ???", async () => {
     const { channelService } = setup();
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
     const result = await channelService.list({ userId: "user-1" });
     assert.equal(result.channels.length, 1);
@@ -411,7 +435,7 @@ describe("ChannelService.list", () => {
 });
 
 describe("ChannelService.join", () => {
-  it("パスワード付きチャンネルに正しいパスワードで入室できる", async () => {
+  it("???????????????????????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const joiner = createUserRecord({ id: "user-2", email: "b@example.com" });
     const { channelService, channelParticipants } = setup([admin, joiner]);
@@ -419,7 +443,7 @@ describe("ChannelService.join", () => {
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "秘密",
+      title: "??",
       settings: { passwordEnabled: true, password: "secret1" },
     });
 
@@ -433,7 +457,7 @@ describe("ChannelService.join", () => {
     assert.equal(channelParticipants.items.length, 2);
   });
 
-  it("パスワード不一致は拒否する", async () => {
+  it("?????????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const joiner = createUserRecord({ id: "user-2", email: "b@example.com" });
     const { channelService } = setup([admin, joiner]);
@@ -441,7 +465,7 @@ describe("ChannelService.join", () => {
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "秘密",
+      title: "??",
       settings: { passwordEnabled: true, password: "secret1" },
     });
 
@@ -457,7 +481,7 @@ describe("ChannelService.join", () => {
     );
   });
 
-  it("ゲスト不可チャンネルへのゲスト入室を拒否する", async () => {
+  it("??????????????????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const guest = createUserRecord({
       id: "user-2",
@@ -470,7 +494,7 @@ describe("ChannelService.join", () => {
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "会員のみ",
+      title: "????",
       settings: { guestAllowed: false },
     });
 
@@ -485,12 +509,12 @@ describe("ChannelService.join", () => {
     );
   });
 
-  it("再入室は既存参加者を返す", async () => {
+  it("????????????", async () => {
     const { channelService, channelParticipants } = setup();
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
     const again = await channelService.join({
       userId: "user-1",
@@ -503,22 +527,22 @@ describe("ChannelService.join", () => {
 });
 
 describe("ChannelService.update", () => {
-  it("管理者がタイトルを更新できる", async () => {
+  it("??????????????", async () => {
     const { channelService } = setup();
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "旧",
+      title: "?",
     });
     const updated = await channelService.update({
       userId: "user-1",
       channelId: created.id,
-      title: "新",
+      title: "?",
     });
-    assert.equal(updated.title, "新");
+    assert.equal(updated.title, "?");
   });
 
-  it("管理者以外は更新できない", async () => {
+  it("????????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const other = createUserRecord({ id: "user-2", email: "b@example.com" });
     const { channelService } = setup([admin, other]);
@@ -526,7 +550,7 @@ describe("ChannelService.update", () => {
     const created = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
 
     await assert.rejects(
@@ -534,7 +558,7 @@ describe("ChannelService.update", () => {
         channelService.update({
           userId: "user-2",
           channelId: created.id,
-          title: "乗っ取り",
+          title: "????",
         }),
       NotChannelAdminError,
     );
@@ -542,7 +566,7 @@ describe("ChannelService.update", () => {
 });
 
 describe("ChannelService.blockUser / unblockUser", () => {
-  it("参加者をキックしてブロックし再入室を拒否する", async () => {
+  it("??????????????????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const target = createUserRecord({ id: "user-2", email: "b@example.com" });
     const { channelService, channelParticipants, blockedUsers } = setup([
@@ -553,7 +577,7 @@ describe("ChannelService.blockUser / unblockUser", () => {
     const channel = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
     await channelService.join({
       userId: "user-2",
@@ -602,12 +626,12 @@ describe("ChannelService.blockUser / unblockUser", () => {
     assert.equal(rejoined.userId, "user-2");
   });
 
-  it("管理者自身はブロックできない", async () => {
+  it("??????????????", async () => {
     const { channelService } = setup();
     const channel = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
     await assert.rejects(
       () =>
@@ -620,7 +644,7 @@ describe("ChannelService.blockUser / unblockUser", () => {
     );
   });
 
-  it("二重ブロックは拒否する", async () => {
+  it("???????????", async () => {
     const admin = createUserRecord({ id: "user-1" });
     const target = createUserRecord({ id: "user-2", email: "b@example.com" });
     const { channelService, channelParticipants } = setup([admin, target]);
@@ -628,7 +652,7 @@ describe("ChannelService.blockUser / unblockUser", () => {
     const channel = await channelService.create({
       userId: "user-1",
       avatarId: "av-user-1",
-      title: "村A",
+      title: "?A",
     });
     await channelService.join({
       userId: "user-2",
@@ -641,7 +665,7 @@ describe("ChannelService.blockUser / unblockUser", () => {
       avatarId: "av-user-2",
     });
 
-    // ブロック済みのまま参加者が残っている状態を再現
+    // ???????????????????????
     const now = new Date();
     channelParticipants.items.push({
       id: "readded",
@@ -662,5 +686,70 @@ describe("ChannelService.blockUser / unblockUser", () => {
         }),
       AlreadyBlockedError,
     );
+  });
+});
+
+describe("ChannelService.get / leave / delete", () => {
+  it("returns channel detail", async () => {
+    const { channelService } = setup();
+    const created = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "Village",
+    });
+    const got = await channelService.get({
+      userId: "user-1",
+      channelId: created.id,
+    });
+    assert.equal(got.id, created.id);
+    assert.equal(got.title, "Village");
+  });
+
+  it("allows non-admin to leave", async () => {
+    const admin = createUserRecord({ id: "user-1" });
+    const member = createUserRecord({ id: "user-2", email: "b@example.com" });
+    const { channelService, channelParticipants } = setup([admin, member]);
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "Village",
+    });
+    await channelService.join({
+      userId: "user-2",
+      channelId: channel.id,
+      avatarId: "av-user-2",
+    });
+    await channelService.leave({ userId: "user-2", channelId: channel.id });
+    assert.ok(
+      channelParticipants.items.find((p) => p.userId === "user-2")?.deletedAt,
+    );
+  });
+
+  it("rejects admin leave", async () => {
+    const { channelService } = setup();
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "Village",
+    });
+    await assert.rejects(
+      () => channelService.leave({ userId: "user-1", channelId: channel.id }),
+      ChannelAdminCannotLeaveError,
+    );
+  });
+
+  it("admin can soft-delete channel", async () => {
+    const { channelService, channels } = setup();
+    const channel = await channelService.create({
+      userId: "user-1",
+      avatarId: "av-user-1",
+      title: "Village",
+    });
+    await channelService.delete({ userId: "user-1", channelId: channel.id });
+    await assert.rejects(
+      () => channelService.get({ userId: "user-1", channelId: channel.id }),
+      ChannelNotFoundError,
+    );
+    assert.ok(channels.items.find((c) => c.id === channel.id)?.deletedAt);
   });
 });
