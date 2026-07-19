@@ -22,6 +22,7 @@ import {
   InvalidEmailTokenError,
   InvalidRefreshTokenError,
   UserAccountLockedError,
+  UserNotFoundError,
 } from "../../shared/errors.js";
 import { hashSecret } from "../../shared/hash.js";
 import { formatOpaqueToken, parseOpaqueToken } from "../../shared/random-token.js";
@@ -119,6 +120,21 @@ class FakeUserRepository implements UserRepository {
 
   async updatePasswordHash(): Promise<UserRecord | null> {
     throw new Error("unused");
+  }
+
+  async updateDisplayName(
+    id: string,
+    displayName: string,
+  ): Promise<UserRecord | null> {
+    const current = this.users.get(id);
+    if (!current) return null;
+    const updated = {
+      ...current,
+      displayName,
+      updatedAt: new Date(),
+    };
+    this.seed(updated);
+    return updated;
   }
 
   async clearLock(): Promise<UserRecord | null> {
@@ -461,6 +477,60 @@ describe("UserService.logout", () => {
           refreshToken: loggedIn.refreshToken,
         }),
       InvalidRefreshTokenError,
+    );
+  });
+});
+
+describe("UserService.updateDisplayName", () => {
+  it("表示名を更新できる", async () => {
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "user@example.com",
+        displayName: "旧名前",
+      }),
+    );
+    const { userService } = service({ users });
+
+    const user = await userService.updateDisplayName({
+      userId: "user-1",
+      displayName: "新名前",
+    });
+
+    assert.equal(user.displayName, "新名前");
+    assert.equal((await users.findById("user-1"))?.displayName, "新名前");
+  });
+
+  it("存在しないユーザーは拒否する", async () => {
+    const { userService } = service();
+    await assert.rejects(
+      () =>
+        userService.updateDisplayName({
+          userId: "missing",
+          displayName: "新名前",
+        }),
+      UserNotFoundError,
+    );
+  });
+
+  it("ロック中ユーザーは拒否する", async () => {
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        lockedAt: new Date(),
+      }),
+    );
+    const { userService } = service({ users });
+
+    await assert.rejects(
+      () =>
+        userService.updateDisplayName({
+          userId: "user-1",
+          displayName: "新名前",
+        }),
+      UserAccountLockedError,
     );
   });
 });

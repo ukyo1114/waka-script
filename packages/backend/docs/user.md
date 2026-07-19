@@ -69,6 +69,26 @@
 
 ---
 
+## 表示名変更
+
+`PATCH /user/display-name`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+**Body:** `{ "displayName": string }`
+
+**成功:** `200 { id, email, displayName }`
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| access token 無効・欠落 | `401 invalid_access_token` |
+| ユーザー不存在 | `404 user_not_found` |
+| アカウントロック | `403 user_account_locked` |
+
+---
+
 ## 環境変数
 
 | 変数 | 用途 |

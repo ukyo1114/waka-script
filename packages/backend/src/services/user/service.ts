@@ -11,6 +11,7 @@ import {
   InvalidCredentialsError,
   NotImplementedError,
   UserAccountLockedError,
+  UserNotFoundError,
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 import {
@@ -46,6 +47,11 @@ export type RefreshTokensInput = {
 
 export type LogoutInput = {
   refreshToken: string;
+};
+
+export type UpdateDisplayNameInput = {
+  userId: string;
+  displayName: string;
 };
 
 export type UserServiceDeps = {
@@ -167,5 +173,23 @@ export class UserService {
       input.refreshToken,
     );
     await deps.refreshTokens.revoke(current.id);
+  }
+
+  /** ログイン中ユーザーの表示名を変更する */
+  async updateDisplayName(input: UpdateDisplayNameInput): Promise<User> {
+    const deps = this.requireDeps();
+    const displayName = input.displayName.trim();
+
+    const existing = await deps.users.findById(input.userId);
+    if (!existing) throw new UserNotFoundError();
+    if (existing.lockedAt) throw new UserAccountLockedError();
+
+    const updated = await deps.users.updateDisplayName(
+      input.userId,
+      displayName,
+    );
+    if (!updated) throw new UserNotFoundError();
+
+    return toPublicUser(updated);
   }
 }

@@ -1,7 +1,10 @@
 import type { Request, Response } from "express";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { UserService } from "../../services/user/index.js";
-import { NotImplementedError } from "../../shared/errors.js";
+import {
+  InvalidAccessTokenError,
+  NotImplementedError,
+} from "../../shared/errors.js";
 import {
   badRequest,
   handleControllerError,
@@ -96,6 +99,32 @@ export async function logout(req: Request, res: Response) {
   try {
     await createUserService(req).logout({ refreshToken });
     return res.status(204).send();
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** PATCH /user/display-name — 表示名変更（要 access token） */
+export async function updateDisplayName(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return handleControllerError(res, new InvalidAccessTokenError());
+  }
+
+  const body = (req.body ?? {}) as JsonBody;
+  const displayName = readString(body, "displayName");
+  if (!displayName) return badRequest(res, "displayName is required");
+
+  try {
+    const user = await createUserService(req).updateDisplayName({
+      userId,
+      displayName,
+    });
+    return res.status(200).json({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+    });
   } catch (error) {
     return handleControllerError(res, error);
   }

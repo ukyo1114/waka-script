@@ -6,5 +6,6 @@ export {
   type LogoutInput,
   type RefreshTokensInput,
   type RegisterUserInput,
+  type UpdateDisplayNameInput,
   type UserServiceDeps,
 } from "./service.js";

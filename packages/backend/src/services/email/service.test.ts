@@ -91,6 +91,14 @@ class FakeUserRepository implements UserRepository {
   async updatePasswordHash(): Promise<UserRecord | null> {
     return this.user;
   }
+  async updateDisplayName(
+    id: string,
+    displayName: string,
+  ): Promise<UserRecord | null> {
+    if (!this.user || this.user.id !== id) return null;
+    this.user = { ...this.user, displayName };
+    return this.user;
+  }
   async clearLock(id: string): Promise<UserRecord | null> {
     this.clearLockCalls.push(id);
     if (!this.user || this.user.id !== id) return null;

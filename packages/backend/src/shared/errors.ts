@@ -98,3 +98,10 @@ export class UserAccountLockedError extends AppError {
     this.name = "UserAccountLockedError";
   }
 }
+
+export class UserNotFoundError extends AppError {
+  constructor() {
+    super(404, "user_not_found", "user not found");
+    this.name = "UserNotFoundError";
+  }
+}

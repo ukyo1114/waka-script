@@ -37,6 +37,13 @@ export class UserRepositoryImpl implements UserRepository {
     return notImplemented();
   }
 
+  updateDisplayName(
+    _id: UserId,
+    _displayName: string,
+  ): Promise<UserRecord | null> {
+    return notImplemented();
+  }
+
   clearLock(_id: UserId): Promise<UserRecord | null> {
     return notImplemented();
   }
