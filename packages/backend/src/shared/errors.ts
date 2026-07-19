@@ -259,3 +259,149 @@ export class EntryProcessingError extends AppError {
     this.name = "EntryProcessingError";
   }
 }
+
+export class ParticipantRoleCountMismatchError extends AppError {
+  constructor(participantCount: number, roleCount: number) {
+    super(
+      409,
+      "participant_role_count_mismatch",
+      `participant count (${participantCount}) does not match role count (${roleCount})`,
+    );
+    this.name = "ParticipantRoleCountMismatchError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// メッセージ
+// ---------------------------------------------------------------------------
+
+export class RoomNotFoundError extends AppError {
+  constructor() {
+    super(404, "room_not_found", "room not found");
+    this.name = "RoomNotFoundError";
+  }
+}
+
+export class MessageNotFoundError extends AppError {
+  constructor() {
+    super(404, "message_not_found", "message not found");
+    this.name = "MessageNotFoundError";
+  }
+}
+
+export class MessageRoomMismatchError extends AppError {
+  constructor() {
+    super(400, "message_room_mismatch", "message does not belong to this room");
+    this.name = "MessageRoomMismatchError";
+  }
+}
+
+export class MessageTypeMismatchError extends AppError {
+  constructor() {
+    super(400, "message_type_mismatch", "message does not belong to this message type");
+    this.name = "MessageTypeMismatchError";
+  }
+}
+
+export class MessageAccessDeniedError extends AppError {
+  constructor() {
+    super(403, "message_access_denied", "no access to this message type");
+    this.name = "MessageAccessDeniedError";
+  }
+}
+
+export class MessageCountLimitExceededError extends AppError {
+  constructor(limit: number) {
+    super(
+      400,
+      "message_count_limit_exceeded",
+      `message count exceeds limit (max ${limit})`,
+    );
+    this.name = "MessageCountLimitExceededError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// プレイヤー・ゲーム
+// ---------------------------------------------------------------------------
+
+export class PlayerNotFoundError extends AppError {
+  constructor() {
+    super(404, "player_not_found", "player not found");
+    this.name = "PlayerNotFoundError";
+  }
+}
+
+export class PlayerNotOwnedError extends AppError {
+  constructor() {
+    super(403, "player_not_owned", "player does not belong to the user");
+    this.name = "PlayerNotOwnedError";
+  }
+}
+
+export class GameNotFoundError extends AppError {
+  constructor() {
+    super(404, "game_not_found", "game not found");
+    this.name = "GameNotFoundError";
+  }
+}
+
+export class GameProcessingError extends AppError {
+  constructor() {
+    super(409, "game_processing", "game is being processed; try again");
+    this.name = "GameProcessingError";
+  }
+}
+
+export class InvalidGamePhaseError extends AppError {
+  constructor() {
+    super(409, "invalid_game_phase", "this action is not allowed in the current phase");
+    this.name = "InvalidGamePhaseError";
+  }
+}
+
+export class ActionPlayerRoleInvalidError extends AppError {
+  constructor() {
+    super(403, "action_player_role_invalid", "player role cannot perform this action");
+    this.name = "ActionPlayerRoleInvalidError";
+  }
+}
+
+export class ActionPlayerDeadError extends AppError {
+  constructor() {
+    super(409, "action_player_dead", "player is dead; cannot perform this action");
+    this.name = "ActionPlayerDeadError";
+  }
+}
+
+export class TargetPlayerDeadError extends AppError {
+  constructor() {
+    super(409, "target_player_dead", "target player is dead");
+    this.name = "TargetPlayerDeadError";
+  }
+}
+
+export class TargetPlayerNotFoundError extends AppError {
+  constructor() {
+    super(400, "target_player_not_found", "target player not found in this game");
+    this.name = "TargetPlayerNotFoundError";
+  }
+}
+
+export class TargetRoleSameError extends AppError {
+  constructor() {
+    super(400, "target_role_same", "target player has the same role as the actor");
+    this.name = "TargetRoleSameError";
+  }
+}
+
+export class SocketAuthContextInvalidError extends AppError {
+  constructor() {
+    super(
+      400,
+      "socket_auth_context_invalid",
+      "exactly one of participantId or playerId must be provided",
+    );
+    this.name = "SocketAuthContextInvalidError";
+  }
+}

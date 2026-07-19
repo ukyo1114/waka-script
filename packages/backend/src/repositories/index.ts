@@ -5,6 +5,9 @@ import type { BlockedUserRepository } from "./blocked-user/index.js";
 import type { ChannelEntryRepository } from "./channel-entry/index.js";
 import type { ChannelParticipantRepository } from "./channel-participant/index.js";
 import type { ChannelRepository } from "./channel/index.js";
+import type { GameRepository } from "./game/index.js";
+import type { MessageRepository } from "./message/index.js";
+import type { PlayerRepository } from "./player/index.js";
 import type { RefreshTokenRepository } from "./refresh-token/index.js";
 import type { UserRepository } from "./user/index.js";
 
@@ -18,6 +21,9 @@ export type Repositories = {
   channelParticipants: ChannelParticipantRepository;
   blockedUsers: BlockedUserRepository;
   channelEntries: ChannelEntryRepository;
+  messages: MessageRepository;
+  games: GameRepository;
+  players: PlayerRepository;
 };
 
 export type {
@@ -91,5 +97,25 @@ export type {
   CreateChannelEntryInput,
 } from "./channel-entry/index.js";
 export { ChannelEntryRepositoryImpl } from "./channel-entry/index.js";
+
+export type {
+  CreateMessageInput,
+  Message,
+  MessageId,
+  MessageRepository,
+} from "./message/index.js";
+export { MessageRepositoryImpl } from "./message/index.js";
+
+export type { CreateGameInput, Game, GameId, GameRepository } from "./game/index.js";
+export { GameRepositoryImpl } from "./game/index.js";
+
+export type {
+  CreatePlayerInput,
+  Player,
+  PlayerId,
+  PlayerRepository,
+  UpdatePlayerInput,
+} from "./player/index.js";
+export { PlayerRepositoryImpl } from "./player/index.js";
 
 export { getRepositories } from "./get-repositories.js";
