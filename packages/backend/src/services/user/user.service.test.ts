@@ -694,6 +694,31 @@ describe("UserService.changePassword", () => {
   });
 });
 
+describe("UserService.getMe", () => {
+  it("自分の公開情報を返す", async () => {
+    const users = new FakeUserRepository();
+    users.seed(
+      createUserRecord({
+        id: "user-1",
+        email: "a@example.com",
+        displayName: "太郎",
+      }),
+    );
+    const { userService } = service({ users });
+    const me = await userService.getMe("user-1");
+    assert.equal(me.email, "a@example.com");
+    assert.equal(me.displayName, "太郎");
+    assert.equal("passwordHash" in me, false);
+  });
+
+  it("ロック中は拒否する", async () => {
+    const users = new FakeUserRepository();
+    users.seed(createUserRecord({ lockedAt: new Date() }));
+    const { userService } = service({ users });
+    await assert.rejects(() => userService.getMe("user-1"), UserAccountLockedError);
+  });
+});
+
 describe("UserService.loginAsGuest", () => {
   it("ゲストを作成してトークンを返す", async () => {
     const { userService, users, refreshTokens, avatars } = service();

@@ -159,3 +159,27 @@ export async function changePassword(req: Request, res: Response) {
     return handleControllerError(res, error);
   }
 }
+
+/** GET /user/me — 自分の公開プロフィール（要 access token） */
+export async function getMe(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return handleControllerError(res, new InvalidAccessTokenError());
+  }
+
+  try {
+    const user = await createUserService(req).getMe(userId);
+    return res.status(200).json({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      isGuest: user.isGuest,
+      emailVerifiedAt: user.emailVerifiedAt,
+      lockedAt: user.lockedAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}

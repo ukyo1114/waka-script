@@ -1,5 +1,6 @@
 export {
   changePassword,
+  getMe,
   login,
   loginAsGuest,
   logout,

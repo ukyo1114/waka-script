@@ -273,4 +273,13 @@ export class UserService {
 
     await deps.refreshTokens.revokeAllForUser(input.userId);
   }
+
+  /** ログイン中ユーザーの公開情報を返す */
+  async getMe(userId: string): Promise<User> {
+    const deps = this.requireDeps();
+    const user = await deps.users.findById(userId);
+    if (!user) throw new UserNotFoundError();
+    if (user.lockedAt) throw new UserAccountLockedError();
+    return toPublicUser(user);
+  }
 }

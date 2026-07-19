@@ -89,6 +89,24 @@
 
 ---
 
+## 自分の情報
+
+`GET /user/me`
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+**成功:** `200 { id, email, displayName, isGuest, emailVerifiedAt, lockedAt, createdAt, updatedAt }`
+
+### 失敗時
+
+| 条件 | レスポンス |
+|------|------------|
+| access token 無効・欠落 | `401 invalid_access_token` |
+| ユーザー不存在 | `404 user_not_found` |
+| アカウントロック | `403 user_account_locked` |
+
+---
+
 ## 表示名変更
 
 `PATCH /user/display-name`
