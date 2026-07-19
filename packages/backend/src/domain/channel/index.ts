@@ -1,0 +1,35 @@
+export type {
+  Channel,
+  ChannelId,
+  ChannelParticipant,
+  ChannelParticipantId,
+  ChannelSettings,
+  GameRoleSettings,
+  GameSettings,
+  GameSettingsInput,
+  PhaseDurations,
+  PublicChannelSettings,
+  SettingsInput,
+} from "./channel.types.js";
+export {
+  CHANNEL_DESCRIPTION_MAX_LENGTH,
+  CHANNEL_TITLE_MAX_LENGTH,
+  DEFAULT_PHASE_DURATIONS,
+  GamePhase,
+  PHASE_DURATION_MAX_MINUTES,
+} from "./channel.types.js";
+export type { GamePhase as GamePhaseType } from "./channel.types.js";
+export {
+  assertChannelAdmin,
+  assertGuestAllowed,
+  assertGuestCanCreateChannel,
+  assertJoinAllowed,
+  assertPasswordProvidedIfProtected,
+  buildGameSettings,
+  ensureChannelExists,
+  isPasswordProtected,
+  mergeGameSettings,
+  resolveSettingsForCreate,
+  resolveSettingsForUpdate,
+  toPublicChannelSettings,
+} from "./channel.domain.js";

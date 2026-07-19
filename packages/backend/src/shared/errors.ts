@@ -148,3 +148,42 @@ export class InvalidAvatarImageError extends AppError {
     this.name = "InvalidAvatarImageError";
   }
 }
+
+export class ChannelNotFoundError extends AppError {
+  constructor() {
+    super(404, "channel_not_found", "channel not found");
+    this.name = "ChannelNotFoundError";
+  }
+}
+
+export class NotChannelAdminError extends AppError {
+  constructor() {
+    super(403, "not_channel_admin", "user is not the channel admin");
+    this.name = "NotChannelAdminError";
+  }
+}
+
+export class ChannelGuestNotAllowedError extends AppError {
+  constructor() {
+    super(
+      403,
+      "channel_guest_not_allowed",
+      "guests are not allowed to join this channel",
+    );
+    this.name = "ChannelGuestNotAllowedError";
+  }
+}
+
+export class ChannelPasswordRequiredError extends AppError {
+  constructor(message = "password is required") {
+    super(400, "channel_password_required", message);
+    this.name = "ChannelPasswordRequiredError";
+  }
+}
+
+export class InvalidChannelPasswordError extends AppError {
+  constructor() {
+    super(401, "invalid_channel_password", "channel password is incorrect");
+    this.name = "InvalidChannelPasswordError";
+  }
+}

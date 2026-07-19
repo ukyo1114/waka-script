@@ -34,6 +34,11 @@ export {
   AvatarNotFoundError,
   AvatarAccessDeniedError,
   InvalidAvatarImageError,
+  ChannelNotFoundError,
+  NotChannelAdminError,
+  ChannelGuestNotAllowedError,
+  ChannelPasswordRequiredError,
+  InvalidChannelPasswordError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
 } from "./errors.js";
