@@ -36,6 +36,8 @@
 
 保護 API では `Authorization: Bearer <accessToken>` を使う（`requireAccessToken` ミドルウェア）。
 
+リクエストの形状バリデーションは Zod（失敗時 `400 { error: "validation_error", details: [...] }`）。
+
 ### 失敗時
 
 | 条件 | レスポンス |

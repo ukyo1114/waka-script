@@ -8,7 +8,7 @@ import {
   emailPurposeParamSchema,
   sendCodeBodySchema,
   verifyCodeBodySchema,
-} from "./schemas.js";
+} from "./email.controller.schemas.js";
 
 function createEmailService(req: Request): EmailService {
   try {

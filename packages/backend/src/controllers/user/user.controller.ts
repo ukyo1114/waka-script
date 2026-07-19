@@ -13,7 +13,7 @@ import {
   refreshTokenBodySchema,
   registerBodySchema,
   updateDisplayNameBodySchema,
-} from "./schemas.js";
+} from "./user.controller.schemas.js";
 
 function createUserService(req: Request): UserService {
   try {
