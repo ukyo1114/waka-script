@@ -15,7 +15,7 @@ import type { Repositories } from "./index.js";
 
 /**
  * Postgres Pool から Repositories を組み立てる。
- * Phase 1 では account 系のみ SQL 実装。他は骨格（呼び出し時 throw）。
+ * Phase 2 完了: 全リポジトリが Pool 付き Postgres 実装。
  */
 export function createRepositories(pool: Pool): Repositories {
   return {
@@ -25,11 +25,11 @@ export function createRepositories(pool: Pool): Repositories {
     refreshTokens: new RefreshTokenRepositoryImpl(pool),
     avatars: new AvatarRepositoryImpl(pool),
     channels: new ChannelRepositoryImpl(pool),
-    channelParticipants: new ChannelParticipantRepositoryImpl(),
-    blockedUsers: new BlockedUserRepositoryImpl(),
-    channelEntries: new ChannelEntryRepositoryImpl(),
-    messages: new MessageRepositoryImpl(),
-    games: new GameRepositoryImpl(),
-    players: new PlayerRepositoryImpl(),
+    channelParticipants: new ChannelParticipantRepositoryImpl(pool),
+    blockedUsers: new BlockedUserRepositoryImpl(pool),
+    channelEntries: new ChannelEntryRepositoryImpl(pool),
+    messages: new MessageRepositoryImpl(pool),
+    games: new GameRepositoryImpl(pool),
+    players: new PlayerRepositoryImpl(pool),
   };
 }
