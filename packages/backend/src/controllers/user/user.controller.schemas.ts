@@ -12,10 +12,6 @@ export const loginBodySchema = z.object({
   password: nonEmptyString,
 });
 
-export const refreshTokenBodySchema = z.object({
-  refreshToken: nonEmptyString,
-});
-
 export const updateDisplayNameBodySchema = z.object({
   displayName: nonEmptyString,
 });

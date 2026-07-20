@@ -26,6 +26,8 @@ export type Repositories = {
   players: PlayerRepository;
 };
 
+export { createRepositories } from "./create-repositories.js";
+
 export type {
   CreateUserInput,
   UserRecord,

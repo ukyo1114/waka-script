@@ -4,8 +4,14 @@ import { asyncHandler } from "../../middleware/async-handler.js";
 import { UserService } from "../../services/user/index.js";
 import {
   InvalidAccessTokenError,
+  InvalidRefreshTokenError,
   NotImplementedError,
 } from "../../shared/errors.js";
+import {
+  clearRefreshTokenCookie,
+  readRefreshTokenCookie,
+  setRefreshTokenCookie,
+} from "../../shared/refresh-token-cookie.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
   changePasswordBodySchema,
@@ -13,7 +19,6 @@ import {
   completePasswordResetBodySchema,
   guestLoginBodySchema,
   loginBodySchema,
-  refreshTokenBodySchema,
   registerBodySchema,
   updateDisplayNameBodySchema,
 } from "./user.controller.schemas.js";
@@ -47,19 +52,19 @@ export const register = asyncHandler(async (req, res) => {
   });
 });
 
-/** POST /user/login */
+/** POST /user/login — refresh は HttpOnly Cookie、access のみ JSON */
 export const login = asyncHandler(async (req, res) => {
   const parsed = parseWithSchema(loginBodySchema, req.body, res);
   if (!parsed.ok) return;
 
   const result = await createUserService(req).login(parsed.data);
+  setRefreshTokenCookie(res, result.refreshToken);
   return res.status(200).json({
     id: result.user.id,
     email: result.user.email,
     displayName: result.user.displayName,
     isGuest: result.user.isGuest,
     accessToken: result.accessToken,
-    refreshToken: result.refreshToken,
   });
 });
 
@@ -69,34 +74,39 @@ export const loginAsGuest = asyncHandler(async (req, res) => {
   if (!parsed.ok) return;
 
   const result = await createUserService(req).loginAsGuest(parsed.data);
+  setRefreshTokenCookie(res, result.refreshToken);
   return res.status(201).json({
     id: result.user.id,
     email: result.user.email,
     displayName: result.user.displayName,
     isGuest: result.user.isGuest,
     accessToken: result.accessToken,
-    refreshToken: result.refreshToken,
   });
 });
 
-/** POST /user/token/refresh */
+/** POST /user/token/refresh — Cookie の refresh をローテーション */
 export const refresh = asyncHandler(async (req, res) => {
-  const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
-  if (!parsed.ok) return;
+  const refreshToken = readRefreshTokenCookie(req);
+  if (!refreshToken) throw new InvalidRefreshTokenError();
 
-  const tokens = await createUserService(req).refreshTokens(parsed.data);
+  const tokens = await createUserService(req).refreshTokens({ refreshToken });
+  setRefreshTokenCookie(res, tokens.refreshToken);
   return res.status(200).json({
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
   });
 });
 
-/** POST /user/logout */
+/** POST /user/logout — Cookie の refresh を失効・削除 */
 export const logout = asyncHandler(async (req, res) => {
-  const parsed = parseWithSchema(refreshTokenBodySchema, req.body, res);
-  if (!parsed.ok) return;
-
-  await createUserService(req).logout(parsed.data);
+  const refreshToken = readRefreshTokenCookie(req);
+  if (refreshToken) {
+    try {
+      await createUserService(req).logout({ refreshToken });
+    } catch {
+      // 既に無効でも Cookie は消す（冪等）
+    }
+  }
+  clearRefreshTokenCookie(res);
   return res.status(204).send();
 });
 
