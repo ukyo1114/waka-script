@@ -36,7 +36,6 @@ export type PublicUser = {
 
 export type LoginResponse = PublicUser & {
   accessToken: string;
-  refreshToken: string;
 };
 
 export type RegisterResponse = PublicUser;
