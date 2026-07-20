@@ -40,9 +40,11 @@ export function HomePage() {
   }, []);
 
   function handleLogout() {
-    logout();
-    setUser(null);
-    setError(null);
+    void (async () => {
+      await logout();
+      setUser(null);
+      setError(null);
+    })();
   }
 
   if (loading) {

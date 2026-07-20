@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { clearTokens, saveTokens } from "./auth-storage.ts";
+import { clearTokens, saveAccessToken } from "./auth-storage.ts";
 import { request } from "./client.ts";
 import type { LoginResponse, PublicUser, RegisterResponse } from "./types.ts";
 
@@ -38,7 +38,7 @@ export async function login(input: {
     method: "POST",
     body: data,
   });
-  saveTokens(result.accessToken, result.refreshToken);
+  saveAccessToken(result.accessToken);
   return result;
 }
 
@@ -46,6 +46,18 @@ export async function getMe(): Promise<PublicUser> {
   return request<PublicUser>("/user/me", { auth: true });
 }
 
+export async function refreshAccessToken(): Promise<string> {
+  const result = await request<{ accessToken: string }>("/user/token/refresh", {
+    method: "POST",
+  });
+  saveAccessToken(result.accessToken);
+  return result.accessToken;
+}
+
 export async function logout(): Promise<void> {
-  clearTokens();
+  try {
+    await request<void>("/user/logout", { method: "POST" });
+  } finally {
+    clearTokens();
+  }
 }
