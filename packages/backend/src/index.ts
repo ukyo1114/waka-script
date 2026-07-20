@@ -1,14 +1,22 @@
-import { getDatabaseUrl, getNodeEnv, getPort, loadEnv } from "./config/index.js";
+import {
+  getDatabaseUrl,
+  getNodeEnv,
+  getPort,
+  loadEnv,
+} from "./config/index.js";
+import { createPool } from "./db/index.js";
+import { createRepositories } from "./repositories/create-repositories.js";
 import { createServer } from "./server.js";
 
 loadEnv();
 
-// 本番では未設定時にここで失敗させる（接続クライアント導入前でも設定ミスを早期検知）
 const databaseUrl = getDatabaseUrl();
 const port = getPort();
 const nodeEnv = getNodeEnv();
 
-const { httpServer } = createServer();
+const pool = createPool(databaseUrl);
+const repos = createRepositories(pool);
+const { httpServer } = createServer({ repos });
 
 httpServer.listen(port, () => {
   const dbHost = (() => {
