@@ -11,6 +11,7 @@
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "npm run db:migrate -w @jinro/backend",
     "start": "npm run start -w @jinro/backend",
     "typecheck": "npm run typecheck -w @jinro/backend && npm run typecheck -w @jinro/frontend"
   },
