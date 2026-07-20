@@ -24,7 +24,7 @@ export function createRepositories(pool: Pool): Repositories {
     emailTokens: new EmailTokenRepositoryImpl(pool),
     refreshTokens: new RefreshTokenRepositoryImpl(pool),
     avatars: new AvatarRepositoryImpl(pool),
-    channels: new ChannelRepositoryImpl(),
+    channels: new ChannelRepositoryImpl(pool),
     channelParticipants: new ChannelParticipantRepositoryImpl(),
     blockedUsers: new BlockedUserRepositoryImpl(),
     channelEntries: new ChannelEntryRepositoryImpl(),
