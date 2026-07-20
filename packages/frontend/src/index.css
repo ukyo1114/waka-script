@@ -6,52 +6,25 @@
 
 body {
   margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  line-height: 1.5;
-  color: #1a1a1a;
-  background: #f5f5f5;
 }
 
-.app {
-  min-height: 100vh;
-}
-
+/* 登録ページなど Chakra 未移行画面用の最小スタイル */
 .page {
   max-width: 28rem;
   margin: 0 auto;
   padding: 2rem 1rem;
 }
 
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
-}
-
 .muted {
-  margin: 0 0 1rem;
   color: #666;
   font-size: 0.9rem;
 }
 
 .error {
-  margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 0.375rem;
   background: #fde8e8;
   color: #9b1c1c;
-  font-size: 0.9rem;
-}
-
-.success {
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
-  background: #e6f4ea;
-  color: #1e6b3a;
   font-size: 0.9rem;
 }
 
@@ -75,12 +48,6 @@ h1 {
   font-size: 1rem;
 }
 
-.field input:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 1px;
-  border-color: #3b82f6;
-}
-
 button {
   padding: 0.625rem 1rem;
   border: none;
@@ -91,59 +58,11 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 button.secondary {
   background: #e5e7eb;
   color: #1a1a1a;
 }
 
-button.secondary:hover:not(:disabled) {
-  background: #d1d5db;
-}
-
-.nav-links {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.nav-links a,
 .footer-link a {
   color: #2563eb;
-  text-decoration: none;
-}
-
-.nav-links a:hover,
-.footer-link a:hover {
-  text-decoration: underline;
-}
-
-.footer-link {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.user-info {
-  margin: 0 0 1.5rem;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 1rem;
-  font-size: 0.95rem;
-}
-
-.user-info dt {
-  color: #666;
-}
-
-.user-info dd {
-  margin: 0;
 }

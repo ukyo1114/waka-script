@@ -61,3 +61,14 @@ export async function logout(): Promise<void> {
     clearTokens();
   }
 }
+
+export async function loginAsGuest(input: {
+  displayName?: string;
+} = {}): Promise<LoginResponse> {
+  const result = await request<LoginResponse>("/user/guest", {
+    method: "POST",
+    body: input,
+  });
+  saveAccessToken(result.accessToken);
+  return result;
+}

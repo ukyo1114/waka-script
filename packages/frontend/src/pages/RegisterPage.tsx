@@ -59,9 +59,9 @@ export function RegisterPage() {
     setLoading(true);
     try {
       await register({ token: actionToken, password, displayName });
-      navigate(`/login?email=${encodeURIComponent(email)}`, {
+      navigate("/", {
         replace: true,
-        state: { registered: true },
+        state: { openLogin: true, registered: true, email },
       });
     } catch (err) {
       setError(formatApiError(err));
@@ -153,7 +153,10 @@ export function RegisterPage() {
       )}
 
       <p className="footer-link">
-        既にアカウントをお持ちの方は <Link to="/login">ログイン</Link>
+        既にアカウントをお持ちの方は{" "}
+        <Link to="/" state={{ openLogin: true }}>
+          ログイン
+        </Link>
       </p>
     </main>
   );
