@@ -1,0 +1,269 @@
+// Jinro backend schema (DBML)
+// 根拠: packages/backend domain / repository types
+// JSON 列の中身はドメイン型（ChannelSettings, GameSettings, GamePhaseInfo, GameLogEntry[]）に対応
+
+Project jinro {
+  database_type: "PostgreSQL"
+  Note: '''
+    開発用 DB: docker compose の postgres（DATABASE_URL）
+    ID はアプリ側で UUID 生成（randomUUID）
+    Access JWT は DB に保存しない
+  '''
+}
+
+// ---- Enums ----
+
+Enum game_phase {
+  PRE_GAME
+  DAY
+  NIGHT
+  POST_GAME
+}
+
+Enum channel_entry_status {
+  active
+  cancelled
+  consumed
+}
+
+Enum message_type {
+  NORMAL
+  WEREWOLF
+  SYSTEM
+  SPECTATOR
+  SHARED
+}
+
+Enum player_role {
+  VILLAGER
+  WEREWOLF
+  FORTUNE_TELLER
+  MEDIUM
+  HUNTER
+  POSSESSED
+  FOX
+  TRAITOR
+  SHARER
+  FANATIC
+}
+
+Enum player_status {
+  ALIVE
+  DEAD
+  NON_PLAYER
+}
+
+// email_purpose / email_action_purpose はコード上ハイフン付き
+// （register | email-change | password-reset | unlock）のため varchar で保持
+
+// ---- Tables ----
+
+Table users {
+  id uuid [pk, note: "UserId"]
+  email varchar [null, note: "ゲストは null"]
+  password_hash text [null, note: "bcrypt。ゲストは null。平文は保存しない"]
+  display_name varchar [not null]
+  is_guest boolean [not null, default: false]
+  email_verified_at timestamptz [null]
+  locked_at timestamptz [null]
+  login_attempts int [not null, default: 0, note: "上限 MAX_LOGIN_ATTEMPTS=5"]
+  deleted_at timestamptz [null, note: "論理削除"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "公開型 User に password_hash は含めない（UserRecord のみ）"
+}
+
+Table avatars {
+  id uuid [pk, note: "AvatarId"]
+  user_id uuid [not null, ref: > users.id]
+  name varchar [not null]
+  image_url text [not null, note: "S3 公開 URL。差し替えでも URL は変えない"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "物理削除。上限は登録済み10 / ゲスト1（アプリ制約）"
+}
+
+Table channels {
+  id uuid [pk, note: "ChannelId"]
+  admin_id uuid [not null, ref: > avatars.id, note: "管理者アバター"]
+  admin_user_id uuid [not null, ref: > users.id, note: "管理者ユーザー"]
+  title varchar(100) [not null]
+  description varchar(500) [not null, default: ""]
+  settings jsonb [not null, note: "ChannelSettings: passwordHash, passwordEnabled, guestAllowed"]
+  game_settings jsonb [not null, note: "GameSettings: roles, phaseDurations"]
+  entry_processing boolean [not null, default: false, note: "エントリー処理の排他ロック"]
+  deleted_at timestamptz [null, note: "論理削除"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table channel_participants {
+  id uuid [pk, note: "ChannelParticipantId"]
+  channel_id uuid [not null, ref: > channels.id]
+  user_id uuid [not null, ref: > users.id]
+  avatar_id uuid [not null, ref: > avatars.id]
+  deleted_at timestamptz [null, note: "退出・キック時"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "アクティブ時は (channel_id, user_id) / (channel_id, avatar_id) が一意である想定"
+}
+
+Table channel_entries {
+  id uuid [pk, note: "ChannelEntryId"]
+  channel_id uuid [not null, ref: > channels.id]
+  participant_id uuid [not null, ref: > channel_participants.id]
+  user_id uuid [not null, ref: > users.id]
+  avatar_id uuid [not null, ref: > avatars.id]
+  status channel_entry_status [not null, default: "active"]
+  deleted_at timestamptz [null, note: "取消・消費時"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "status=active のとき (channel_id, participant_id) 一意（entry.md）"
+}
+
+Table blocked_users {
+  id uuid [pk, note: "BlockedUserId"]
+  channel_id uuid [not null, ref: > channels.id]
+  user_id uuid [not null, ref: > users.id, note: "ブロック対象"]
+  avatar_id uuid [not null, ref: > avatars.id, note: "ブロック時点のアバター"]
+  deleted_at timestamptz [null, note: "解除時"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "アクティブ時は (channel_id, user_id) 一意である想定"
+}
+
+Table games {
+  id uuid [pk, note: "GameId"]
+  channel_id uuid [not null, ref: > channels.id]
+  description text [not null, default: "", note: "開始時チャンネル説明のスナップショット"]
+  game_settings jsonb [not null, note: "開始時 GameSettings のスナップショット"]
+  logs jsonb [not null, default: "[]", note: "GameLogEntry[]"]
+  processing boolean [not null, default: false]
+  phase_info jsonb [not null, note: "GamePhaseInfo: phase, day, changedAt, nextPhaseAt"]
+  started_at timestamptz [not null]
+  ended_at timestamptz [null]
+  deleted_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table players {
+  id uuid [pk, note: "PlayerId"]
+  game_id uuid [not null, ref: > games.id]
+  avatar_id uuid [not null, ref: > avatars.id]
+  user_id uuid [not null, ref: > users.id]
+  name varchar [not null, note: "開始時スナップショット"]
+  picture_url text [not null, note: "開始時スナップショット"]
+  role player_role [not null]
+  status player_status [not null, default: "ALIVE"]
+  deleted_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table messages {
+  id uuid [pk, note: "MessageId"]
+  room_id uuid [not null, note: "ChannelId または GameId（ポリモーフィック。厳密 FK なし）"]
+  sender_id varchar [not null, note: "participantId / playerId / 'system'"]
+  content varchar(1000) [not null]
+  message_type message_type [not null]
+  reply_to_message_id uuid [null, ref: > messages.id]
+  deleted_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: "一覧は (room_id, message_type, created_at) で絞る想定"
+}
+
+Table refresh_tokens {
+  id uuid [pk, note: "RefreshTokenId。opaque token の id 部分"]
+  user_id uuid [not null, ref: > users.id]
+  token_hash text [not null, note: "平文は保存しない"]
+  expires_at timestamptz [not null, note: "TTL 30日"]
+  revoked_at timestamptz [null]
+  replaced_by_token_id uuid [null, ref: > refresh_tokens.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "論理削除カラムなし。失効は revoked_at"
+}
+
+Table email_codes {
+  id uuid [pk, note: "EmailCodeId"]
+  email varchar [not null]
+  user_id uuid [null, ref: > users.id]
+  purpose varchar [not null, note: "register | email-change | password-reset | unlock"]
+  code_hash text [not null, note: "平文コードは保存しない"]
+  expires_at timestamptz [not null]
+  used_at timestamptz [null]
+  attempt_count int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "lookup: email+purpose の最新、または purpose+code_hash"
+}
+
+Table email_tokens {
+  id uuid [pk, note: "EmailTokenId。opaque token の id 部分"]
+  email varchar [not null]
+  user_id uuid [null, ref: > users.id]
+  purpose varchar [not null, note: "register | email-change | password-reset（unlock なし）"]
+  token_hash text [not null, note: "平文は保存しない"]
+  expires_at timestamptz [not null]
+  used_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---- Indexes ----
+
+TableGroup account [color: #E8F5E9] {
+  users
+  avatars
+  refresh_tokens
+  email_codes
+  email_tokens
+}
+
+TableGroup channel [color: #E3F2FD] {
+  channels
+  channel_participants
+  channel_entries
+  blocked_users
+}
+
+TableGroup game [color: #FFF3E0] {
+  games
+  players
+  messages
+}
+
+// Partial unique 等は DBML の Index 記法で表現しきれないものがあるため Note に記載。
+// 実装時の推奨インデックス:
+
+/*
+CREATE UNIQUE INDEX users_email_unique
+  ON users (email)
+  WHERE email IS NOT NULL AND deleted_at IS NULL;
+
+CREATE UNIQUE INDEX channel_participants_active_user
+  ON channel_participants (channel_id, user_id)
+  WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX channel_participants_active_avatar
+  ON channel_participants (channel_id, avatar_id)
+  WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX channel_entries_active_participant
+  ON channel_entries (channel_id, participant_id)
+  WHERE status = 'active';
+
+CREATE UNIQUE INDEX blocked_users_active
+  ON blocked_users (channel_id, user_id)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX messages_room_type_created
+  ON messages (room_id, message_type, created_at DESC);
+*/
