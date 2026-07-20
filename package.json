@@ -5,10 +5,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @jinro/backend",
+    "build": "npm run build -w @jinro/backend && npm run build -w @jinro/frontend",
     "dev": "npm run dev -w @jinro/backend",
+    "dev:frontend": "npm run dev -w @jinro/frontend",
     "start": "npm run start -w @jinro/backend",
-    "typecheck": "npm run typecheck -w @jinro/backend"
+    "typecheck": "npm run typecheck -w @jinro/backend && npm run typecheck -w @jinro/frontend"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
