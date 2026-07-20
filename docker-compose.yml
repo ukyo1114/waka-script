@@ -1,0 +1,21 @@
+# 開発用 Postgres のみ
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jinro-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: jinro
+      POSTGRES_PASSWORD: jinro
+      POSTGRES_DB: jinro
+    volumes:
+      - jinro_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jinro -d jinro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jinro_postgres_data:
