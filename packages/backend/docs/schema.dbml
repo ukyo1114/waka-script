@@ -1,6 +1,9 @@
 // Jinro backend schema (DBML)
-// 根拠: packages/backend domain / repository types
-// JSON 列の中身はドメイン型（ChannelSettings, GameSettings, GamePhaseInfo, GameLogEntry[]）に対応
+// 方針: 生 SQL リポジトリ向け。第3正規形（3NF）を基本とする。
+// - 他テーブルから JOIN で一意に導出できる属性は持たない
+//   例: avatar_id があれば user_id は avatars.user_id から取得
+// - ゲーム開始時点のスナップショット（名称・設定など）は「その時点の事実」として残す
+//   （現在の avatars / channels 行と一致し続ける前提ではない）
 
 Project jinro {
   database_type: "PostgreSQL"
@@ -8,6 +11,7 @@ Project jinro {
     開発用 DB: docker compose の postgres（DATABASE_URL）
     ID はアプリ側で UUID 生成（randomUUID）
     Access JWT は DB に保存しない
+    正規化: 3NF。導出可能カラムは置かない
   '''
 }
 
@@ -53,7 +57,7 @@ Enum player_status {
   NON_PLAYER
 }
 
-// email_purpose / email_action_purpose はコード上ハイフン付き
+// email purpose はコード上ハイフン付き
 // （register | email-change | password-reset | unlock）のため varchar で保持
 
 // ---- Tables ----
@@ -87,8 +91,7 @@ Table avatars {
 
 Table channels {
   id uuid [pk, note: "ChannelId"]
-  admin_id uuid [not null, ref: > avatars.id, note: "管理者アバター"]
-  admin_user_id uuid [not null, ref: > users.id, note: "管理者ユーザー"]
+  admin_id uuid [not null, ref: > avatars.id, note: "管理者アバター。admin の user は avatars.user_id で取得"]
   title varchar(100) [not null]
   description varchar(500) [not null, default: ""]
   settings jsonb [not null, note: "ChannelSettings: passwordHash, passwordEnabled, guestAllowed"]
@@ -97,51 +100,59 @@ Table channels {
   deleted_at timestamptz [null, note: "論理削除"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+
+  Note: "admin_user_id は置かない（admin_id → avatars.user_id）"
 }
 
 Table channel_participants {
   id uuid [pk, note: "ChannelParticipantId"]
   channel_id uuid [not null, ref: > channels.id]
-  user_id uuid [not null, ref: > users.id]
   avatar_id uuid [not null, ref: > avatars.id]
   deleted_at timestamptz [null, note: "退出・キック時"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
-  Note: "アクティブ時は (channel_id, user_id) / (channel_id, avatar_id) が一意である想定"
+  Note: '''
+    user_id は置かない（avatar_id → avatars.user_id）
+    アクティブ時は (channel_id, avatar_id) 一意
+    「同一 user の多重参加禁止」は avatars 経由でアプリまたは制約で担保
+  '''
 }
 
 Table channel_entries {
   id uuid [pk, note: "ChannelEntryId"]
-  channel_id uuid [not null, ref: > channels.id]
   participant_id uuid [not null, ref: > channel_participants.id]
-  user_id uuid [not null, ref: > users.id]
-  avatar_id uuid [not null, ref: > avatars.id]
   status channel_entry_status [not null, default: "active"]
   deleted_at timestamptz [null, note: "取消・消費時"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
-  Note: "status=active のとき (channel_id, participant_id) 一意（entry.md）"
+  Note: '''
+    channel_id / user_id / avatar_id は置かない
+    （いずれも participant_id → channel_participants → avatars で取得）
+    status=active のとき participant_id 一意
+  '''
 }
 
 Table blocked_users {
   id uuid [pk, note: "BlockedUserId"]
   channel_id uuid [not null, ref: > channels.id]
-  user_id uuid [not null, ref: > users.id, note: "ブロック対象"]
-  avatar_id uuid [not null, ref: > avatars.id, note: "ブロック時点のアバター"]
+  avatar_id uuid [not null, ref: > avatars.id, note: "ブロック対象アバター。user は avatars.user_id で取得"]
   deleted_at timestamptz [null, note: "解除時"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
-  Note: "アクティブ時は (channel_id, user_id) 一意である想定"
+  Note: '''
+    user_id は置かない（avatar_id → avatars.user_id）
+    アクティブ時は (channel_id, avatar_id) 一意
+  '''
 }
 
 Table games {
   id uuid [pk, note: "GameId"]
   channel_id uuid [not null, ref: > channels.id]
-  description text [not null, default: "", note: "開始時チャンネル説明のスナップショット"]
-  game_settings jsonb [not null, note: "開始時 GameSettings のスナップショット"]
+  description text [not null, default: "", note: "開始時点のスナップショット（チャンネル現行値とは独立）"]
+  game_settings jsonb [not null, note: "開始時点の GameSettings スナップショット"]
   logs jsonb [not null, default: "[]", note: "GameLogEntry[]"]
   processing boolean [not null, default: false]
   phase_info jsonb [not null, note: "GamePhaseInfo: phase, day, changedAt, nextPhaseAt"]
@@ -150,20 +161,26 @@ Table games {
   deleted_at timestamptz [null]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+
+  Note: "description / game_settings は開始時の事実。channels からの導出ではない"
 }
 
 Table players {
   id uuid [pk, note: "PlayerId"]
   game_id uuid [not null, ref: > games.id]
   avatar_id uuid [not null, ref: > avatars.id]
-  user_id uuid [not null, ref: > users.id]
-  name varchar [not null, note: "開始時スナップショット"]
-  picture_url text [not null, note: "開始時スナップショット"]
+  name varchar [not null, note: "開始時点の表示名スナップショット"]
+  picture_url text [not null, note: "開始時点の画像 URL スナップショット"]
   role player_role [not null]
   status player_status [not null, default: "ALIVE"]
   deleted_at timestamptz [null]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    user_id は置かない（avatar_id → avatars.user_id）
+    name / picture_url は開始時の事実（後からアバターを変えてもゲーム内表示は固定）
+  '''
 }
 
 Table messages {
@@ -194,8 +211,8 @@ Table refresh_tokens {
 
 Table email_codes {
   id uuid [pk, note: "EmailCodeId"]
-  email varchar [not null]
-  user_id uuid [null, ref: > users.id]
+  email varchar [not null, note: "検証対象アドレス（email-change 時は変更先。users.email とは限らない）"]
+  user_id uuid [null, ref: > users.id, note: "紐づけ可能なときのみ"]
   purpose varchar [not null, note: "register | email-change | password-reset | unlock"]
   code_hash text [not null, note: "平文コードは保存しない"]
   expires_at timestamptz [not null]
@@ -203,21 +220,21 @@ Table email_codes {
   attempt_count int [not null, default: 0]
   created_at timestamptz [not null, default: `now()`]
 
-  Note: "lookup: email+purpose の最新、または purpose+code_hash"
+  Note: "email は検証対象そのものなので user から導出せず保持"
 }
 
 Table email_tokens {
   id uuid [pk, note: "EmailTokenId。opaque token の id 部分"]
-  email varchar [not null]
-  user_id uuid [null, ref: > users.id]
+  email varchar [not null, note: "アクション対象アドレス（users.email とは限らない）"]
+  user_id uuid [null, ref: > users.id, note: "紐づけ可能なときのみ"]
   purpose varchar [not null, note: "register | email-change | password-reset（unlock なし）"]
   token_hash text [not null, note: "平文は保存しない"]
   expires_at timestamptz [not null]
   used_at timestamptz [null]
   created_at timestamptz [not null, default: `now()`]
-}
 
-// ---- Indexes ----
+  Note: "email はアクション対象そのものなので user から導出せず保持"
+}
 
 TableGroup account [color: #E8F5E9] {
   users
@@ -240,30 +257,30 @@ TableGroup game [color: #FFF3E0] {
   messages
 }
 
-// Partial unique 等は DBML の Index 記法で表現しきれないものがあるため Note に記載。
-// 実装時の推奨インデックス:
+// 推奨インデックス（3NF 後のキーに合わせる）:
 
 /*
 CREATE UNIQUE INDEX users_email_unique
   ON users (email)
   WHERE email IS NOT NULL AND deleted_at IS NULL;
 
-CREATE UNIQUE INDEX channel_participants_active_user
-  ON channel_participants (channel_id, user_id)
-  WHERE deleted_at IS NULL;
-
 CREATE UNIQUE INDEX channel_participants_active_avatar
   ON channel_participants (channel_id, avatar_id)
   WHERE deleted_at IS NULL;
 
 CREATE UNIQUE INDEX channel_entries_active_participant
-  ON channel_entries (channel_id, participant_id)
+  ON channel_entries (participant_id)
   WHERE status = 'active';
 
-CREATE UNIQUE INDEX blocked_users_active
-  ON blocked_users (channel_id, user_id)
+CREATE UNIQUE INDEX blocked_users_active_avatar
+  ON blocked_users (channel_id, avatar_id)
   WHERE deleted_at IS NULL;
 
 CREATE INDEX messages_room_type_created
   ON messages (room_id, message_type, created_at DESC);
+
+-- 同一チャンネルに同一 user が複数アバターで参加できない場合の例（要検討）:
+-- CREATE UNIQUE INDEX channel_participants_active_user
+--   ON channel_participants (channel_id, (SELECT user_id FROM avatars a WHERE a.id = avatar_id))
+--   … PostgreSQL では generated column / トリガ等で表現
 */
