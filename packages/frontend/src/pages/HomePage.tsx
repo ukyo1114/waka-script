@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   Center,
@@ -7,18 +9,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
 import { GuestLoginModal } from "../components/GuestLoginModal.tsx";
 import { LoginModal } from "../components/LoginModal.tsx";
-import {
-  formatApiError,
-  getMe,
-  isLoggedIn,
-  logout,
-  refreshAccessToken,
-  type PublicUser,
-} from "../api/index.ts";
+import { useAuthStore } from "../stores/index.ts";
 
 type HomeLocationState = {
   openLogin?: boolean;
@@ -31,50 +24,16 @@ export function HomePage() {
   const location = useLocation();
   const locationState = (location.state as HomeLocationState | null) ?? {};
 
-  const [user, setUser] = useState<PublicUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
+  const status = useAuthStore((s) => s.status);
+  const error = useAuthStore((s) => s.error);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const logout = useAuthStore((s) => s.logout);
+
   const [loginOpen, setLoginOpen] = useState(false);
   const [guestOpen, setGuestOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginRegistered, setLoginRegistered] = useState(false);
-
-  const loadUser = useCallback(async () => {
-    const me = await getMe();
-    setUser(me);
-    setError(null);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        if (isLoggedIn()) {
-          await loadUser();
-          return;
-        }
-        try {
-          await refreshAccessToken();
-          await loadUser();
-        } catch {
-          // Cookie なし or 期限切れ — 未ログインのまま
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(formatApiError(err));
-          await logout();
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadUser]);
 
   useEffect(() => {
     if (locationState.openLogin) {
@@ -90,24 +49,7 @@ export function HomePage() {
     navigate,
   ]);
 
-  async function handleAuthSuccess() {
-    setLoading(true);
-    try {
-      await loadUser();
-    } catch (err) {
-      setError(formatApiError(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleLogout() {
-    await logout();
-    setUser(null);
-    setError(null);
-  }
-
-  if (loading) {
+  if (status === "idle" || status === "loading") {
     return (
       <Center minH="100vh">
         <Spinner size="lg" />
@@ -126,7 +68,7 @@ export function HomePage() {
           <Button
             variant="outline"
             colorPalette="gray"
-            onClick={() => void handleLogout()}
+            onClick={() => void logout()}
           >
             ログアウト
           </Button>
@@ -180,12 +122,12 @@ export function HomePage() {
         onOpenChange={setLoginOpen}
         initialEmail={loginEmail}
         registered={loginRegistered}
-        onSuccess={() => void handleAuthSuccess()}
+        onSuccess={() => void refreshUser()}
       />
       <GuestLoginModal
         open={guestOpen}
         onOpenChange={setGuestOpen}
-        onSuccess={() => void handleAuthSuccess()}
+        onSuccess={() => void refreshUser()}
       />
     </>
   );
