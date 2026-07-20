@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Request } from "express";
+import { asyncHandler } from "../../middleware/async-handler.js";
 import { getRepositories } from "../../repositories/get-repositories.js";
 import { AvatarService } from "../../services/avatar/index.js";
 import {
@@ -7,7 +8,6 @@ import {
   NotImplementedError,
 } from "../../shared/errors.js";
 import { getObjectStorage } from "../../shared/get-object-storage.js";
-import { handleControllerError } from "../../shared/http.js";
 import { parseWithSchema } from "../../shared/validation.js";
 import {
   avatarIdParamsSchema,
@@ -30,12 +30,9 @@ function createAvatarService(req: Request): AvatarService {
   }
 }
 
-function requireUserId(req: Request, res: Response): string | null {
+function requireUserId(req: Request): string {
   const userId = req.auth?.userId;
-  if (!userId) {
-    handleControllerError(res, new InvalidAccessTokenError());
-    return null;
-  }
+  if (!userId) throw new InvalidAccessTokenError();
   return userId;
 }
 
@@ -54,106 +51,73 @@ function toAvatarJson(avatar: {
 }
 
 /** POST /avatar — アバター作成（要 access token） */
-export async function createAvatar(req: Request, res: Response) {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+export const createAvatar = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const parsed = parseWithSchema(createAvatarBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const avatar = await createAvatarService(req).create({
-      userId,
-      name: parsed.data.name,
-    });
-    return res.status(201).json(toAvatarJson(avatar));
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const avatar = await createAvatarService(req).create({
+    userId,
+    name: parsed.data.name,
+  });
+  return res.status(201).json(toAvatarJson(avatar));
+});
 
 /** GET /avatar — 自分のアバター一覧（要 access token） */
-export async function listAvatars(req: Request, res: Response) {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const avatars = await createAvatarService(req).list({ userId });
-    return res.status(200).json({
-      avatars: avatars.map(toAvatarJson),
-    });
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+export const listAvatars = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
+  const avatars = await createAvatarService(req).list({ userId });
+  return res.status(200).json({
+    avatars: avatars.map(toAvatarJson),
+  });
+});
 
 /** PATCH /avatar/:id — 名前変更（要 access token） */
-export async function updateAvatarName(req: Request, res: Response) {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+export const updateAvatarName = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const params = parseWithSchema(avatarIdParamsSchema, req.params, res);
   if (!params.ok) return;
 
   const parsed = parseWithSchema(updateAvatarNameBodySchema, req.body, res);
   if (!parsed.ok) return;
 
-  try {
-    const avatar = await createAvatarService(req).updateName({
-      userId,
-      avatarId: params.data.id,
-      name: parsed.data.name,
-    });
-    return res.status(200).json(toAvatarJson(avatar));
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const avatar = await createAvatarService(req).updateName({
+    userId,
+    avatarId: params.data.id,
+    name: parsed.data.name,
+  });
+  return res.status(200).json(toAvatarJson(avatar));
+});
 
 /** PUT /avatar/:id/image — 画像差し替え（multipart, 要 access token） */
-export async function updateAvatarImage(req: Request, res: Response) {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+export const updateAvatarImage = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const params = parseWithSchema(avatarIdParamsSchema, req.params, res);
   if (!params.ok) return;
 
   const file = req.file;
   if (!file) {
-    return handleControllerError(
-      res,
-      new InvalidAvatarImageError("image file is required (field: image)"),
-    );
+    throw new InvalidAvatarImageError("image file is required (field: image)");
   }
 
-  try {
-    const avatar = await createAvatarService(req).updateImage({
-      userId,
-      avatarId: params.data.id,
-      body: file.buffer,
-      contentType: file.mimetype,
-    });
-    return res.status(200).json(toAvatarJson(avatar));
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  const avatar = await createAvatarService(req).updateImage({
+    userId,
+    avatarId: params.data.id,
+    body: file.buffer,
+    contentType: file.mimetype,
+  });
+  return res.status(200).json(toAvatarJson(avatar));
+});
 
 /** DELETE /avatar/:id — アバター削除（要 access token、最低1件残す） */
-export async function deleteAvatar(req: Request, res: Response) {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+export const deleteAvatar = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req);
   const params = parseWithSchema(avatarIdParamsSchema, req.params, res);
   if (!params.ok) return;
 
-  try {
-    await createAvatarService(req).delete({
-      userId,
-      avatarId: params.data.id,
-    });
-    return res.status(204).send();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  await createAvatarService(req).delete({
+    userId,
+    avatarId: params.data.id,
+  });
+  return res.status(204).send();
+});

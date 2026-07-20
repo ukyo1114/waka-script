@@ -6,8 +6,10 @@ import {
   assertJoinAllowed,
   assertChannelAdmin,
   assertChannelAdminCannotLeave,
+  assertChannelPasswordMatches,
   buildGameSettings,
   ensureChannelExists,
+  ensureOwnedChannelParticipant,
   getCountToStartGame,
   isCountReachedToStartGame,
   isPasswordProtected,
@@ -20,8 +22,10 @@ import {
   ChannelAdminCannotLeaveError,
   ChannelGuestNotAllowedError,
   ChannelNotFoundError,
+  ChannelParticipantNotFoundError,
   ChannelPasswordRequiredError,
   GuestActionNotAllowedError,
+  InvalidChannelPasswordError,
   NotChannelAdminError,
 } from "../../shared/errors.js";
 
@@ -198,5 +202,55 @@ describe("getCountToStartGame / isCountReachedToStartGame", () => {
     assert.equal(getCountToStartGame(gs), 3);
     assert.equal(isCountReachedToStartGame(gs, 3), true);
     assert.equal(isCountReachedToStartGame(gs, 2), false);
+  });
+});
+
+describe("ensureOwnedChannelParticipant", () => {
+  it("本人かつ同チャンネルなら通す", () => {
+    const now = new Date();
+    const participant = {
+      id: "p1",
+      channelId: "ch-1",
+      userId: "u1",
+      avatarId: "a1",
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    assert.equal(
+      ensureOwnedChannelParticipant(participant, "ch-1", "u1"),
+      participant,
+    );
+  });
+
+  it("不一致は NotFound", () => {
+    const now = new Date();
+    const participant = {
+      id: "p1",
+      channelId: "ch-1",
+      userId: "u1",
+      avatarId: "a1",
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    assert.throws(
+      () => ensureOwnedChannelParticipant(participant, "ch-1", "u2"),
+      ChannelParticipantNotFoundError,
+    );
+    assert.throws(
+      () => ensureOwnedChannelParticipant(null, "ch-1", "u1"),
+      ChannelParticipantNotFoundError,
+    );
+  });
+});
+
+describe("assertChannelPasswordMatches", () => {
+  it("不一致のみ拒否", () => {
+    assert.doesNotThrow(() => assertChannelPasswordMatches(true));
+    assert.throws(
+      () => assertChannelPasswordMatches(false),
+      InvalidChannelPasswordError,
+    );
   });
 });

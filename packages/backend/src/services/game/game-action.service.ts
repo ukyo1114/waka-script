@@ -4,10 +4,14 @@ import {
   upsertActionRequest,
   type GameActionType,
 } from "../../domain/game/index.js";
-import { assertPlayerOwnedByUser, ensurePlayerExists } from "../../domain/player/index.js";
+import {
+  assertPlayerOwnedByUser,
+  ensurePlayerExists,
+  ensureTargetPlayerExists,
+} from "../../domain/player/index.js";
 import type { GameRepository } from "../../repositories/game/index.js";
 import type { PlayerRepository } from "../../repositories/player/index.js";
-import { NotImplementedError, TargetPlayerNotFoundError } from "../../shared/errors.js";
+import { NotImplementedError } from "../../shared/errors.js";
 
 export type GameActionServiceDeps = {
   games: GameRepository;
@@ -44,11 +48,12 @@ export class GameActionService {
     const actionPlayer = ensurePlayerExists(rawActionPlayer);
     assertPlayerOwnedByUser(actionPlayer.userId, input.userId);
 
-    const targetPlayer = await deps.players.findActiveByIdAndGameId(
-      input.targetId,
-      input.gameId,
+    const targetPlayer = ensureTargetPlayerExists(
+      await deps.players.findActiveByIdAndGameId(
+        input.targetId,
+        input.gameId,
+      ),
     );
-    if (!targetPlayer) throw new TargetPlayerNotFoundError();
 
     canReceiveRequest({
       game,

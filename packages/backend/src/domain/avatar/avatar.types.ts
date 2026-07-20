@@ -18,6 +18,9 @@ export const AVATAR_LIMIT_REGISTERED = 10;
 /** ゲストユーザーのアバター上限 */
 export const AVATAR_LIMIT_GUEST = 1;
 
+/** アバター画像の最大サイズ（バイト） */
+export const AVATAR_IMAGE_MAX_BYTES = 1 * 1024 * 1024;
+
 /**
  * アバター画像の公開ベース URL（末尾スラッシュなし）。
  * 例: https://cdn.example.com または CloudFront

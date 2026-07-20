@@ -17,6 +17,7 @@ export {
   RECEIVE_ALLOWED,
   SEND_ALLOWED,
   assertCanAccessMessageType,
+  buildGameMessageContext,
   canReceiveMessageType,
   canSendMessageType,
   ensureMessageBelongsToRoom,

@@ -1,4 +1,8 @@
-import { PlayerNotFoundError, PlayerNotOwnedError } from "../../shared/errors.js";
+import {
+  PlayerNotFoundError,
+  PlayerNotOwnedError,
+  TargetPlayerNotFoundError,
+} from "../../shared/errors.js";
 import type { UserId } from "../user/index.js";
 import { PlayerStatus, type Player } from "./player.types.js";
 
@@ -11,6 +15,30 @@ export const ensurePlayerExists = (player: Player | null): Player => {
   }
   return player;
 };
+
+export const ensureTargetPlayerExists = (player: Player | null): Player => {
+  if (!player || player.deletedAt) {
+    throw new TargetPlayerNotFoundError();
+  }
+  return player;
+};
+
+/** 指定ゲームに属し、操作者本人のプレイヤーであることを保証する */
+export function ensureOwnedPlayerForGame(
+  player: Player | null,
+  gameId: string,
+  userId: UserId,
+): Player {
+  if (
+    !player ||
+    player.deletedAt ||
+    player.gameId !== gameId ||
+    player.userId !== userId
+  ) {
+    throw new PlayerNotFoundError();
+  }
+  return player;
+}
 
 export const assertPlayerOwnedByUser = (
   playerUserId: UserId,

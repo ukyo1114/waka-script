@@ -1,4 +1,18 @@
 import type { User } from "../../domain/user/index.js";
+import {
+  assertEmailAvailableForChange,
+  assertEmailNotRegistered,
+  assertGuestActionAllowed,
+  ensureActiveUser,
+  ensureLoginCredentialsUser,
+  ensurePasswordResetUser,
+  ensureUserAllowedToRefresh,
+  ensureUserExists,
+  normalizeDisplayName,
+  normalizeEmail,
+  throwAfterFailedLogin,
+  toPublicUser,
+} from "../../domain/user/index.js";
 import type { AvatarRepository } from "../../repositories/avatar/index.js";
 import type { EmailTokenRepository } from "../../repositories/email-token/index.js";
 import type { RefreshTokenRepository } from "../../repositories/refresh-token/index.js";
@@ -8,11 +22,8 @@ import type {
 } from "../../repositories/user/index.js";
 import { signAccessToken } from "../../shared/access-token.js";
 import {
-  EmailAlreadyRegisteredError,
-  GuestActionNotAllowedError,
   InvalidCredentialsError,
   NotImplementedError,
-  UserAccountLockedError,
   UserNotFoundError,
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
@@ -90,15 +101,6 @@ export type UserServiceDeps = {
   jwtSecret?: string;
 };
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function toPublicUser(record: UserRecord): User {
-  const { passwordHash: _passwordHash, ...user } = record;
-  return user;
-}
-
 /**
  * ユーザー登録・ログイン・トークン関連を担う。
  */
@@ -143,7 +145,7 @@ export class UserService {
 
     const email = normalizeEmail(actionToken.email);
     const existing = await deps.users.findByEmail(email);
-    if (existing) throw new EmailAlreadyRegisteredError(email);
+    assertEmailNotRegistered(existing, email);
 
     const passwordHash = await hashSecret(input.password);
     const created = await deps.users.create({
@@ -168,18 +170,13 @@ export class UserService {
   async login(input: LoginUserInput): Promise<LoginResult> {
     const deps = this.requireDeps();
     const email = normalizeEmail(input.email);
-    const user = await deps.users.findByEmail(email);
-
-    if (!user || user.isGuest || user.passwordHash === null || user.deletedAt) {
-      throw new InvalidCredentialsError();
-    }
-    if (user.lockedAt) throw new UserAccountLockedError();
+    const raw = await deps.users.findByEmail(email);
+    const user = ensureLoginCredentialsUser(raw);
 
     const matched = await verifySecret(input.password, user.passwordHash);
     if (!matched) {
       const afterFail = await deps.users.recordFailedLogin(user.id);
-      if (afterFail?.lockedAt) throw new UserAccountLockedError();
-      throw new InvalidCredentialsError();
+      throwAfterFailedLogin(afterFail);
     }
 
     await deps.users.resetLoginAttempts(user.id);
@@ -194,7 +191,7 @@ export class UserService {
    */
   async loginAsGuest(input: LoginAsGuestInput = {}): Promise<LoginResult> {
     const deps = this.requireDeps();
-    const displayName = input.displayName?.trim() || "Guest";
+    const displayName = normalizeDisplayName(input.displayName);
 
     const created = await deps.users.create({
       email: null,
@@ -220,7 +217,7 @@ export class UserService {
     );
 
     const user = await deps.users.findById(current.userId);
-    if (!user || user.lockedAt) throw new UserAccountLockedError();
+    ensureUserAllowedToRefresh(user);
 
     const next = await createRefreshTokenForUser(
       deps.refreshTokens,
@@ -251,8 +248,7 @@ export class UserService {
     const displayName = input.displayName.trim();
 
     const existing = await deps.users.findById(input.userId);
-    if (!existing) throw new UserNotFoundError();
-    if (existing.lockedAt) throw new UserAccountLockedError();
+    ensureActiveUser(existing);
 
     const updated = await deps.users.updateDisplayName(
       input.userId,
@@ -271,15 +267,12 @@ export class UserService {
     const deps = this.requireDeps();
 
     const existing = await deps.users.findById(input.userId);
-    if (!existing) throw new UserNotFoundError();
-    if (existing.lockedAt) throw new UserAccountLockedError();
-    if (existing.isGuest || existing.passwordHash === null) {
-      throw new GuestActionNotAllowedError("changePassword");
-    }
+    const user = ensureActiveUser(existing) as UserRecord;
+    assertGuestActionAllowed(user, "changePassword");
 
     const matched = await verifySecret(
       input.currentPassword,
-      existing.passwordHash,
+      user.passwordHash!,
     );
     if (!matched) throw new InvalidCredentialsError();
 
@@ -297,9 +290,7 @@ export class UserService {
   async getMe(userId: string): Promise<User> {
     const deps = this.requireDeps();
     const user = await deps.users.findById(userId);
-    if (!user || user.deletedAt) throw new UserNotFoundError();
-    if (user.lockedAt) throw new UserAccountLockedError();
-    return toPublicUser(user);
+    return toPublicUser(ensureActiveUser(user) as UserRecord);
   }
 
   /**
@@ -309,9 +300,8 @@ export class UserService {
   async completeEmailChange(input: CompleteEmailChangeInput): Promise<User> {
     const deps = this.requireDeps();
     const existing = await deps.users.findById(input.userId);
-    if (!existing || existing.deletedAt) throw new UserNotFoundError();
-    if (existing.lockedAt) throw new UserAccountLockedError();
-    if (existing.isGuest) throw new GuestActionNotAllowedError("emailChange");
+    const user = ensureActiveUser(existing);
+    assertGuestActionAllowed(user, "emailChange");
 
     const actionToken = await resolveActionToken(deps.emailTokens, {
       token: input.token,
@@ -320,9 +310,7 @@ export class UserService {
 
     const newEmail = normalizeEmail(actionToken.email);
     const taken = await deps.users.findByEmail(newEmail);
-    if (taken && taken.id !== input.userId) {
-      throw new EmailAlreadyRegisteredError(newEmail);
-    }
+    assertEmailAvailableForChange(taken, input.userId, newEmail);
 
     const updated = await deps.users.updateEmail(input.userId, newEmail);
     if (!updated) throw new UserNotFoundError();
@@ -331,8 +319,7 @@ export class UserService {
     await deps.emailTokens.markUsed(actionToken.id);
 
     const refreshed = await deps.users.findById(input.userId);
-    if (!refreshed) throw new UserNotFoundError();
-    return toPublicUser(refreshed);
+    return toPublicUser(ensureUserExists(refreshed) as UserRecord);
   }
 
   /**
@@ -349,14 +336,11 @@ export class UserService {
     });
 
     const email = normalizeEmail(actionToken.email);
-    const user =
+    const raw =
       (actionToken.userId
         ? await deps.users.findById(actionToken.userId)
         : null) ?? (await deps.users.findByEmail(email));
-
-    if (!user || user.deletedAt || user.isGuest || user.passwordHash === null) {
-      throw new InvalidCredentialsError();
-    }
+    const user = ensurePasswordResetUser(raw);
 
     const passwordHash = await hashSecret(input.newPassword);
     const updated = await deps.users.updatePasswordHash(user.id, passwordHash);
@@ -370,7 +354,7 @@ export class UserService {
   async deleteAccount(input: DeleteAccountInput): Promise<void> {
     const deps = this.requireDeps();
     const existing = await deps.users.findById(input.userId);
-    if (!existing || existing.deletedAt) throw new UserNotFoundError();
+    ensureUserExists(existing);
 
     await deps.users.softDelete(input.userId);
     await deps.refreshTokens.revokeAllForUser(input.userId);

@@ -5,13 +5,18 @@ import {
   assertEmailCodeSendable,
   assertEmailEligibility,
   assertVerificationAttemptAllowed,
+  ensureActionTokenRecordValid,
+  ensureVerificationCodeLive,
   isEmailActionPurpose,
   isEmailPurpose,
+  resolveVerifyCodeOutcome,
 } from "./email.domain.js";
 import { EMAIL_CODE_RESEND_COOLDOWN_SECONDS } from "./email.types.js";
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
+  InvalidEmailTokenError,
+  InvalidVerificationCodeError,
   TokenSendNotAllowedError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
@@ -193,6 +198,79 @@ describe("assertVerificationAttemptAllowed", () => {
     assert.throws(
       () => assertVerificationAttemptAllowed(6),
       VerificationAttemptsExceededError,
+    );
+  });
+});
+
+describe("ensureVerificationCodeLive", () => {
+  const now = new Date("2026-01-01T00:00:00Z");
+
+  it("有効なら返す", () => {
+    const code = {
+      usedAt: null,
+      expiresAt: new Date(now.getTime() + 60_000),
+    };
+    assert.equal(ensureVerificationCodeLive(code, now), code);
+  });
+
+  it("null / used / expired は拒否", () => {
+    assert.throws(
+      () => ensureVerificationCodeLive(null, now),
+      InvalidVerificationCodeError,
+    );
+    assert.throws(
+      () =>
+        ensureVerificationCodeLive(
+          { usedAt: now, expiresAt: new Date(now.getTime() + 60_000) },
+          now,
+        ),
+      InvalidVerificationCodeError,
+    );
+    assert.throws(
+      () =>
+        ensureVerificationCodeLive(
+          { usedAt: null, expiresAt: now },
+          now,
+        ),
+      InvalidVerificationCodeError,
+    );
+  });
+});
+
+describe("resolveVerifyCodeOutcome", () => {
+  it("purpose に応じた分岐を返す", () => {
+    assert.deepEqual(resolveVerifyCodeOutcome("unlock"), { kind: "unlock" });
+    assert.deepEqual(resolveVerifyCodeOutcome("register"), {
+      kind: "issue-action-token",
+      purpose: "register",
+    });
+    assert.deepEqual(resolveVerifyCodeOutcome("email-change"), {
+      kind: "issue-action-token",
+      purpose: "email-change",
+    });
+    assert.deepEqual(resolveVerifyCodeOutcome("password-reset"), {
+      kind: "issue-action-token",
+      purpose: "password-reset",
+    });
+  });
+});
+
+describe("ensureActionTokenRecordValid", () => {
+  const now = new Date("2026-01-01T00:00:00Z");
+  const base = {
+    usedAt: null as Date | null,
+    expiresAt: new Date(now.getTime() + 60_000),
+    purpose: "register" as const,
+  };
+
+  it("有効なら返す", () => {
+    assert.equal(ensureActionTokenRecordValid(base, now, "register"), base);
+  });
+
+  it("purpose 不一致などは拒否", () => {
+    assert.throws(
+      () => ensureActionTokenRecordValid(base, now, "email-change"),
+      InvalidEmailTokenError,
     );
   });
 });

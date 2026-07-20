@@ -5,24 +5,26 @@ import {
   MessageType,
   SYSTEM_SENDER_ID,
   assertCanAccessMessageType,
+  buildGameMessageContext,
   ensureMessageBelongsToRoom,
   ensureMessageBelongsToType,
   ensureMessageCountWithinLimit,
   ensureMessageExists,
-  getMessageSenderRoleFromPlayer,
   validateReplyToMessage,
   type Message,
   type MessageSendContext,
 } from "../../domain/message/index.js";
+import {
+  ensureOwnedChannelParticipant,
+} from "../../domain/channel/index.js";
+import { ensureOwnedPlayerForGame } from "../../domain/player/index.js";
 import type { ChannelParticipantRepository } from "../../repositories/channel-participant/index.js";
 import type { ChannelRepository } from "../../repositories/channel/index.js";
 import type { GameRepository } from "../../repositories/game/index.js";
 import type { MessageRepository } from "../../repositories/message/index.js";
 import type { PlayerRepository } from "../../repositories/player/index.js";
 import {
-  ChannelParticipantNotFoundError,
   NotImplementedError,
-  PlayerNotFoundError,
   RoomNotFoundError,
 } from "../../shared/errors.js";
 
@@ -98,28 +100,26 @@ export class MessageService {
 
     const channel = await deps.channels.findById(roomId);
     if (channel && !channel.deletedAt) {
-      const participant = await deps.channelParticipants.findActiveById(senderId);
-      if (
-        !participant ||
-        participant.channelId !== roomId ||
-        participant.userId !== userId
-      ) {
-        throw new ChannelParticipantNotFoundError();
-      }
+      ensureOwnedChannelParticipant(
+        await deps.channelParticipants.findActiveById(senderId),
+        roomId,
+        userId,
+      );
       return CHANNEL_MESSAGE_CONTEXT;
     }
 
     const game = await deps.games.findById(roomId);
     if (game && !game.deletedAt) {
-      const player = await deps.players.findActiveById(senderId);
-      if (!player || player.gameId !== roomId || player.userId !== userId) {
-        throw new PlayerNotFoundError();
-      }
-      return {
-        messageUserRole: getMessageSenderRoleFromPlayer(player),
-        isGameEnded: game.endedAt !== null,
-        isProcessing: game.processing,
-      };
+      const player = ensureOwnedPlayerForGame(
+        await deps.players.findActiveById(senderId),
+        roomId,
+        userId,
+      );
+      return buildGameMessageContext({
+        player,
+        endedAt: game.endedAt,
+        processing: game.processing,
+      });
     }
 
     throw new RoomNotFoundError();

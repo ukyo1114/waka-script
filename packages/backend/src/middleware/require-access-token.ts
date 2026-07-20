@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import { InvalidAccessTokenError } from "../shared/errors.js";
 import { verifyAccessToken } from "../shared/access-token.js";
-import { handleControllerError } from "../shared/http.js";
+import { InvalidAccessTokenError } from "../shared/errors.js";
+import { asyncHandler } from "./async-handler.js";
 
 export type AuthContext = {
   userId: string;
@@ -26,12 +26,8 @@ function readBearerToken(req: Request): string | null {
 /**
  * Authorization: Bearer <accessToken> を検証し req.auth に userId を載せる。
  */
-export async function requireAccessToken(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  try {
+export const requireAccessToken = asyncHandler(
+  async (req: Request, _res: Response, next: NextFunction) => {
     const token = readBearerToken(req);
     if (!token) throw new InvalidAccessTokenError();
 
@@ -41,7 +37,5 @@ export async function requireAccessToken(
     });
     req.auth = { userId: claims.userId };
     next();
-  } catch (error) {
-    return handleControllerError(res, error);
-  }
-}
+  },
+);

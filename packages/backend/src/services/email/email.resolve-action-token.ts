@@ -1,3 +1,8 @@
+import {
+  assertEmailTokenSecretMatches,
+  ensureActionTokenRecordValid,
+  type EmailActionPurpose,
+} from "../../domain/email/index.js";
 import type {
   EmailToken,
   EmailTokenRepository,
@@ -5,7 +10,6 @@ import type {
 import { InvalidEmailTokenError } from "../../shared/errors.js";
 import { verifySecret } from "../../shared/hash.js";
 import { parseEmailToken } from "../../shared/random-token.js";
-import type { EmailActionPurpose } from "../../domain/email/index.js";
 
 export type ResolveActionTokenInput = {
   token: string;
@@ -24,20 +28,14 @@ export async function resolveActionToken(
   const parsed = parseEmailToken(input.token);
   if (!parsed) throw new InvalidEmailTokenError();
 
-  const record = await emailTokens.findById(parsed.id);
-  const now = new Date();
-
-  if (
-    !record ||
-    record.usedAt !== null ||
-    record.expiresAt <= now ||
-    (input.purpose !== undefined && record.purpose !== input.purpose)
-  ) {
-    throw new InvalidEmailTokenError();
-  }
+  const record = ensureActionTokenRecordValid(
+    await emailTokens.findById(parsed.id),
+    new Date(),
+    input.purpose,
+  );
 
   const matched = await verifySecret(parsed.secret, record.tokenHash);
-  if (!matched) throw new InvalidEmailTokenError();
+  assertEmailTokenSecretMatches(matched);
 
   return record;
 }

@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { assertAvatarOwnedByUser } from "../../domain/avatar/index.js";
+import {
+  assertAvatarOwnedByUser,
+  ensureAvatarExists,
+} from "../../domain/avatar/index.js";
 import {
   assertCannotBlockChannelAdmin,
   assertNotAlreadyBlocked,
@@ -9,10 +12,12 @@ import {
 import {
   assertChannelAdmin,
   assertChannelAdminCannotLeave,
+  assertChannelPasswordMatches,
   assertGuestCanCreateChannel,
   assertJoinAllowed,
   buildGameSettings,
   ensureChannelExists,
+  ensureChannelParticipantExists,
   isPasswordProtected,
   mergeGameSettings,
   resolveSettingsForCreate,
@@ -24,6 +29,7 @@ import {
   type PublicChannelSettings,
   type SettingsInput,
 } from "../../domain/channel/index.js";
+import { ensureActiveUser } from "../../domain/user/index.js";
 import type { EventBus } from "../../events/index.js";
 import {
   channelDeletedEvent,
@@ -36,14 +42,10 @@ import type { ChannelParticipantRepository } from "../../repositories/channel-pa
 import type { ChannelRepository } from "../../repositories/channel/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
 import {
-  AvatarNotFoundError,
   BlockedUserNotFoundError,
   ChannelNotFoundError,
   ChannelParticipantNotFoundError,
-  InvalidChannelPasswordError,
   NotImplementedError,
-  UserAccountLockedError,
-  UserNotFoundError,
 } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 
@@ -157,16 +159,14 @@ export class ChannelService {
 
   private async requireActiveUser(userId: string) {
     const user = await this.requireDeps().users.findById(userId);
-    if (!user) throw new UserNotFoundError();
-    if (user.lockedAt) throw new UserAccountLockedError();
-    return user;
+    return ensureActiveUser(user);
   }
 
   private async requireOwnedAvatar(userId: string, avatarId: string) {
     const avatar = await this.requireDeps().avatars.findById(avatarId);
-    if (!avatar) throw new AvatarNotFoundError();
-    assertAvatarOwnedByUser(avatar.userId, userId);
-    return avatar;
+    const existing = ensureAvatarExists(avatar);
+    assertAvatarOwnedByUser(existing.userId, userId);
+    return existing;
   }
 
   private async requireAdminChannel(userId: string, channelId: string) {
@@ -266,7 +266,7 @@ export class ChannelService {
         input.password!,
         channel.settings.passwordHash!,
       );
-      if (!ok) throw new InvalidChannelPasswordError();
+      assertChannelPasswordMatches(ok);
     }
 
     const blocked = await deps.blockedUsers.findActiveByChannelIdAndUserId(
@@ -387,12 +387,12 @@ export class ChannelService {
       input.channelId,
     );
 
-    const participant =
+    const participant = ensureChannelParticipantExists(
       await deps.channelParticipants.findActiveByChannelIdAndAvatarId(
         channel.id,
         input.avatarId,
-      );
-    if (!participant) throw new ChannelParticipantNotFoundError();
+      ),
+    );
 
     assertCannotBlockChannelAdmin(channel.adminUserId, participant.userId);
 

@@ -2,15 +2,18 @@ import {
   AvatarAccessDeniedError,
   AvatarLimitExceededError,
   AvatarMinimumRequiredError,
+  AvatarNotFoundError,
+  InvalidAvatarImageError,
 } from "../../shared/errors.js";
-import type { UserId } from "../user/index.js";
 import {
+  AVATAR_IMAGE_MAX_BYTES,
   AVATAR_LIMIT_GUEST,
   AVATAR_LIMIT_REGISTERED,
   DEFAULT_AVATAR_IMAGE_PUBLIC_BASE_URL,
   type AssertAvatarCreatable,
   type AssertAvatarDeletable,
   type AssertAvatarOwnedByUser,
+  type Avatar,
   type GetAvatarLimit,
 } from "./avatar.types.js";
 
@@ -47,6 +50,44 @@ export const assertAvatarDeletable: AssertAvatarDeletable = (currentCount) => {
     throw new AvatarMinimumRequiredError();
   }
 };
+
+export function ensureAvatarExists(avatar: Avatar | null): Avatar {
+  if (!avatar) {
+    throw new AvatarNotFoundError();
+  }
+  return avatar;
+}
+
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+export function assertAvatarImageValid(
+  body: Buffer,
+  contentType: string,
+): void {
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+    throw new InvalidAvatarImageError(
+      "content type must be image/jpeg, image/png, or image/webp",
+    );
+  }
+  if (body.length === 0) {
+    throw new InvalidAvatarImageError("image file is empty");
+  }
+  if (body.length > AVATAR_IMAGE_MAX_BYTES) {
+    throw new InvalidAvatarImageError("image file must be 1MB or less");
+  }
+}
+
+export function normalizeAvatarName(
+  name: string,
+  fallback = "Avatar",
+): string {
+  const trimmed = name.trim();
+  return trimmed || fallback;
+}
 
 /** S3 オブジェクトキー（バケット内パス） */
 export function buildAvatarObjectKey(avatarId: string): string {

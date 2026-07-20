@@ -1,4 +1,5 @@
 import express from "express";
+import { errorHandler } from "./middleware/index.js";
 import type { Repositories } from "./repositories/index.js";
 import { avatarRouter } from "./routes/avatar.js";
 import { channelRouter } from "./routes/channel.js";
@@ -41,6 +42,8 @@ export function createApp(options?: CreateAppOptions | Repositories) {
   app.use("/channel", channelRouter);
   app.use("/message", messageRouter);
   app.use("/game", gameRouter);
+
+  app.use(errorHandler);
 
   return app;
 }

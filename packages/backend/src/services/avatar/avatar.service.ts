@@ -2,30 +2,25 @@ import { randomUUID } from "node:crypto";
 import {
   assertAvatarCreatable,
   assertAvatarDeletable,
+  assertAvatarImageValid,
   assertAvatarOwnedByUser,
   buildAvatarImageUrl,
   buildAvatarObjectKey,
+  ensureAvatarExists,
+  normalizeAvatarName,
+  AVATAR_IMAGE_MAX_BYTES,
   type Avatar,
 } from "../../domain/avatar/index.js";
+import { ensureActiveUser } from "../../domain/user/index.js";
 import type { AvatarRepository } from "../../repositories/avatar/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
 import {
   AvatarNotFoundError,
-  InvalidAvatarImageError,
   NotImplementedError,
-  UserAccountLockedError,
-  UserNotFoundError,
 } from "../../shared/errors.js";
 import type { ObjectStorage } from "../../shared/object-storage.js";
 
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-
-/** アバター画像の最大サイズ（バイト） */
-export const AVATAR_IMAGE_MAX_BYTES = 1 * 1024 * 1024;
+export { AVATAR_IMAGE_MAX_BYTES };
 
 export type CreateAvatarInput = {
   userId: string;
@@ -81,19 +76,15 @@ export class AvatarService {
   }
 
   private async requireActiveUser(userId: string) {
-    const deps = this.requireDeps();
-    const user = await deps.users.findById(userId);
-    if (!user) throw new UserNotFoundError();
-    if (user.lockedAt) throw new UserAccountLockedError();
-    return user;
+    const user = await this.requireDeps().users.findById(userId);
+    return ensureActiveUser(user);
   }
 
   private async requireOwnedAvatar(userId: string, avatarId: string) {
-    const deps = this.requireDeps();
-    const avatar = await deps.avatars.findById(avatarId);
-    if (!avatar) throw new AvatarNotFoundError();
-    assertAvatarOwnedByUser(avatar.userId, userId);
-    return avatar;
+    const avatar = await this.requireDeps().avatars.findById(avatarId);
+    const existing = ensureAvatarExists(avatar);
+    assertAvatarOwnedByUser(existing.userId, userId);
+    return existing;
   }
 
   async create(input: CreateAvatarInput): Promise<Avatar> {
@@ -120,7 +111,7 @@ export class AvatarService {
     return deps.avatars.create({
       id,
       userId: input.userId,
-      name: input.displayName.trim() || "Avatar",
+      name: normalizeAvatarName(input.displayName),
       imageUrl: buildAvatarImageUrl(id, deps.avatarImagePublicBaseUrl),
     });
   }
@@ -151,17 +142,7 @@ export class AvatarService {
     await this.requireActiveUser(input.userId);
     const avatar = await this.requireOwnedAvatar(input.userId, input.avatarId);
 
-    if (!ALLOWED_IMAGE_TYPES.has(input.contentType)) {
-      throw new InvalidAvatarImageError(
-        "content type must be image/jpeg, image/png, or image/webp",
-      );
-    }
-    if (input.body.length === 0) {
-      throw new InvalidAvatarImageError("image file is empty");
-    }
-    if (input.body.length > AVATAR_IMAGE_MAX_BYTES) {
-      throw new InvalidAvatarImageError("image file must be 1MB or less");
-    }
+    assertAvatarImageValid(input.body, input.contentType);
 
     if (!deps.objectStorage) {
       throw new NotImplementedError("objectStorage");
