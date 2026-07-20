@@ -69,7 +69,7 @@ export function GuestLoginModal({
                     お試しプレイ用です。データは引き継がれません。
                   </Text>
                   {error && (
-                    <Text color="red.600" fontSize="sm">
+                    <Text color="fg.error" fontSize="sm">
                       {error}
                     </Text>
                   )}
@@ -89,7 +89,7 @@ export function GuestLoginModal({
                     キャンセル
                   </Button>
                 </Dialog.ActionTrigger>
-                <Button type="submit" loading={loading}>
+                <Button type="submit" colorPalette="blue" loading={loading}>
                   はじめる
                 </Button>
               </Dialog.Footer>

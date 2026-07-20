@@ -70,12 +70,12 @@ export function LoginModal({
               <Dialog.Body>
                 <Stack gap="4">
                   {registered && (
-                    <Text color="green.600" fontSize="sm">
+                    <Text color="fg.success" fontSize="sm">
                       登録が完了しました。ログインしてください。
                     </Text>
                   )}
                   {error && (
-                    <Text color="red.600" fontSize="sm">
+                    <Text color="fg.error" fontSize="sm">
                       {error}
                     </Text>
                   )}
@@ -105,7 +105,7 @@ export function LoginModal({
                     キャンセル
                   </Button>
                 </Dialog.ActionTrigger>
-                <Button type="submit" loading={loading}>
+                <Button type="submit" colorPalette="blue" loading={loading}>
                   ログイン
                 </Button>
               </Dialog.Footer>

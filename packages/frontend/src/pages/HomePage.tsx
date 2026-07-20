@@ -123,7 +123,11 @@ export function HomePage() {
           <Text color="fg.muted">
             {user.isGuest ? "ゲスト" : user.email ?? "登録ユーザー"}
           </Text>
-          <Button variant="outline" onClick={() => void handleLogout()}>
+          <Button
+            variant="outline"
+            colorPalette="gray"
+            onClick={() => void handleLogout()}
+          >
             ログアウト
           </Button>
         </VStack>
@@ -141,24 +145,30 @@ export function HomePage() {
           </Stack>
 
           {error && (
-            <Text color="red.600" fontSize="sm">
+            <Text color="fg.error" fontSize="sm">
               {error}
             </Text>
           )}
 
           <Stack gap="3" w="full">
-            <Button size="lg" w="full" onClick={() => setLoginOpen(true)}>
+            <Button
+              size="lg"
+              w="full"
+              colorPalette="blue"
+              onClick={() => setLoginOpen(true)}
+            >
               ログイン
             </Button>
             <Button
               size="lg"
               w="full"
               variant="outline"
+              colorPalette="gray"
               onClick={() => setGuestOpen(true)}
             >
               ゲストログイン
             </Button>
-            <Button size="lg" w="full" variant="surface" asChild>
+            <Button size="lg" w="full" variant="surface" colorPalette="gray" asChild>
               <Link to="/register">新規登録</Link>
             </Button>
           </Stack>
