@@ -18,7 +18,15 @@ export {
 export {
   assertEmailCodeSendable,
   assertEmailEligibility,
+  assertEmailTokenSecretMatches,
   assertVerificationAttemptAllowed,
+  assertVerificationCodeMatches,
+  ensureActionTokenRecordValid,
+  ensureVerificationCodeLive,
   isEmailActionPurpose,
   isEmailPurpose,
+  resolveVerifyCodeOutcome,
+  type EmailCodeLiveness,
+  type EmailTokenLiveness,
+  type VerifyCodeOutcome,
 } from "./email.domain.js";

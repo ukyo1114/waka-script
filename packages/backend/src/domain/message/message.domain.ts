@@ -129,12 +129,24 @@ export const assertCanAccessMessageType = (
   }
 };
 
-/** チャンネル（ゲーム開始前）は NORMAL のみ送受信可能 */
 export const CHANNEL_MESSAGE_CONTEXT: MessageSendContext = {
   messageUserRole: "NORMAL",
   isGameEnded: false,
   isProcessing: false,
 };
+
+/** ゲームルームの送受信コンテキストを組み立てる（エンティティは取得済み前提） */
+export function buildGameMessageContext(input: {
+  player: Player;
+  endedAt: Date | null;
+  processing: boolean;
+}): MessageSendContext {
+  return {
+    messageUserRole: getMessageSenderRoleFromPlayer(input.player),
+    isGameEnded: input.endedAt !== null,
+    isProcessing: input.processing,
+  };
+}
 
 export const ensureMessageExists = (message: Message | null): Message => {
   if (!message || message.deletedAt) {

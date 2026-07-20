@@ -1,6 +1,8 @@
 import {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
+  InvalidEmailTokenError,
+  InvalidVerificationCodeError,
   TokenSendNotAllowedError,
   UserNotLockedError,
   VerificationAttemptsExceededError,
@@ -13,6 +15,7 @@ import {
   type AssertEmailCodeSendable,
   type AssertEmailEligibility,
   type AssertVerificationAttemptAllowed,
+  type EmailActionPurpose,
   type EmailPurpose,
   type IsEmailActionPurpose,
   type IsEmailPurpose,
@@ -94,3 +97,70 @@ export const assertVerificationAttemptAllowed: AssertVerificationAttemptAllowed 
       throw new VerificationAttemptsExceededError(maxAttempts);
     }
   };
+
+/** 認証コードの生存（未使用・未期限切れ）を保証する */
+export type EmailCodeLiveness = {
+  usedAt: Date | null;
+  expiresAt: Date;
+};
+
+export function ensureVerificationCodeLive<T extends EmailCodeLiveness>(
+  emailCode: T | null,
+  now: Date,
+): T {
+  if (!emailCode || emailCode.usedAt !== null || emailCode.expiresAt <= now) {
+    throw new InvalidVerificationCodeError();
+  }
+  return emailCode;
+}
+
+export type VerifyCodeOutcome =
+  | { kind: "unlock" }
+  | { kind: "issue-action-token"; purpose: EmailActionPurpose }
+  | { kind: "noop" };
+
+/** verify 成功後にサービスが取るべき分岐（I/O はサービス側） */
+export function resolveVerifyCodeOutcome(
+  purpose: EmailPurpose,
+): VerifyCodeOutcome {
+  if (purpose === "unlock") return { kind: "unlock" };
+  if (isEmailActionPurpose(purpose)) {
+    return { kind: "issue-action-token", purpose };
+  }
+  return { kind: "noop" };
+}
+
+/** アクション用トークンレコードの生存・purpose 一致を保証する */
+export type EmailTokenLiveness = {
+  usedAt: Date | null;
+  expiresAt: Date;
+  purpose: EmailActionPurpose | EmailPurpose;
+};
+
+export function ensureActionTokenRecordValid<T extends EmailTokenLiveness>(
+  record: T | null,
+  now: Date,
+  purpose?: EmailActionPurpose,
+): T {
+  if (
+    !record ||
+    record.usedAt !== null ||
+    record.expiresAt <= now ||
+    (purpose !== undefined && record.purpose !== purpose)
+  ) {
+    throw new InvalidEmailTokenError();
+  }
+  return record;
+}
+
+export function assertEmailTokenSecretMatches(matched: boolean): void {
+  if (!matched) {
+    throw new InvalidEmailTokenError();
+  }
+}
+
+export function assertVerificationCodeMatches(matched: boolean): void {
+  if (!matched) {
+    throw new InvalidVerificationCodeError();
+  }
+}

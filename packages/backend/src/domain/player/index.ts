@@ -11,7 +11,9 @@ export {
 } from "./player.types.js";
 export {
   assertPlayerOwnedByUser,
+  ensureOwnedPlayerForGame,
   ensurePlayerExists,
+  ensureTargetPlayerExists,
   isPlayerAlive,
   playerRoleLabel,
 } from "./player.domain.js";

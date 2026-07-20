@@ -3,17 +3,23 @@ import { describe, it } from "node:test";
 import {
   assertAvatarCreatable,
   assertAvatarDeletable,
+  assertAvatarImageValid,
   assertAvatarOwnedByUser,
+  AVATAR_IMAGE_MAX_BYTES,
   AVATAR_LIMIT_GUEST,
   AVATAR_LIMIT_REGISTERED,
   buildAvatarImageUrl,
   buildAvatarObjectKey,
+  ensureAvatarExists,
   getAvatarLimit,
+  normalizeAvatarName,
 } from "./index.js";
 import {
   AvatarAccessDeniedError,
   AvatarLimitExceededError,
   AvatarMinimumRequiredError,
+  AvatarNotFoundError,
+  InvalidAvatarImageError,
 } from "../../shared/errors.js";
 
 describe("getAvatarLimit", () => {
@@ -70,5 +76,57 @@ describe("buildAvatarObjectKey / buildAvatarImageUrl", () => {
       buildAvatarImageUrl("abc", "https://cdn.example.com/"),
       "https://cdn.example.com/avatars/abc",
     );
+  });
+});
+
+describe("ensureAvatarExists", () => {
+  it("null なら NotFound", () => {
+    assert.throws(() => ensureAvatarExists(null), AvatarNotFoundError);
+  });
+
+  it("あれば返す", () => {
+    const avatar = {
+      id: "a1",
+      userId: "u1",
+      name: "N",
+      imageUrl: "https://example.com/a",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    assert.equal(ensureAvatarExists(avatar), avatar);
+  });
+});
+
+describe("assertAvatarImageValid", () => {
+  it("jpeg かつ非空なら通す", () => {
+    assert.doesNotThrow(() =>
+      assertAvatarImageValid(Buffer.from("x"), "image/jpeg"),
+    );
+  });
+
+  it("不正 MIME / 空 / 超過を拒否する", () => {
+    assert.throws(
+      () => assertAvatarImageValid(Buffer.from("x"), "image/gif"),
+      InvalidAvatarImageError,
+    );
+    assert.throws(
+      () => assertAvatarImageValid(Buffer.alloc(0), "image/png"),
+      InvalidAvatarImageError,
+    );
+    assert.throws(
+      () =>
+        assertAvatarImageValid(
+          Buffer.alloc(AVATAR_IMAGE_MAX_BYTES + 1),
+          "image/png",
+        ),
+      InvalidAvatarImageError,
+    );
+  });
+});
+
+describe("normalizeAvatarName", () => {
+  it("trim し空ならフォールバック", () => {
+    assert.equal(normalizeAvatarName("  A  "), "A");
+    assert.equal(normalizeAvatarName("   "), "Avatar");
   });
 });

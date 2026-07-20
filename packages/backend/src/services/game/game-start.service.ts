@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { ensureChannelExists } from "../../domain/channel/index.js";
+import {
+  ensureAvatarExists,
+} from "../../domain/avatar/index.js";
+import {
+  ensureChannelExists,
+  ensureChannelParticipantExists,
+} from "../../domain/channel/index.js";
 import {
   buildNewGameCreatePayload,
   buildPlayersFromParticipants,
@@ -10,11 +16,7 @@ import type { ChannelParticipantRepository } from "../../repositories/channel-pa
 import type { ChannelRepository } from "../../repositories/channel/index.js";
 import type { Game, GameRepository } from "../../repositories/game/index.js";
 import type { Player, PlayerRepository } from "../../repositories/player/index.js";
-import {
-  AvatarNotFoundError,
-  ChannelParticipantNotFoundError,
-  NotImplementedError,
-} from "../../shared/errors.js";
+import { NotImplementedError } from "../../shared/errors.js";
 
 export type GameStartServiceDeps = {
   channels: ChannelRepository;
@@ -59,11 +61,12 @@ export class GameStartService {
 
     const snapshots: ChannelParticipantSnapshot[] = [];
     for (const participantId of input.participantIds) {
-      const participant =
-        await deps.channelParticipants.findActiveById(participantId);
-      if (!participant) throw new ChannelParticipantNotFoundError();
-      const avatar = await deps.avatars.findById(participant.avatarId);
-      if (!avatar) throw new AvatarNotFoundError();
+      const participant = ensureChannelParticipantExists(
+        await deps.channelParticipants.findActiveById(participantId),
+      );
+      const avatar = ensureAvatarExists(
+        await deps.avatars.findById(participant.avatarId),
+      );
       snapshots.push({
         userId: participant.userId,
         avatarId: participant.avatarId,

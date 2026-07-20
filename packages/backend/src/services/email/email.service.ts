@@ -2,18 +2,20 @@ import {
   assertEmailCodeSendable,
   assertEmailEligibility,
   assertVerificationAttemptAllowed,
+  assertVerificationCodeMatches,
   EMAIL_ACTION_TOKEN_TTL_SECONDS,
   EMAIL_CODE_TTL_MINUTES,
-  isEmailActionPurpose,
+  ensureVerificationCodeLive,
+  resolveVerifyCodeOutcome,
   type EmailPurpose,
 } from "../../domain/email/index.js";
+import { normalizeEmail } from "../../domain/user/index.js";
 import type { EmailCodeRepository } from "../../repositories/email-code/index.js";
 import type {
   EmailToken,
   EmailTokenRepository,
 } from "../../repositories/email-token/index.js";
 import type { UserRepository } from "../../repositories/user/index.js";
-import { InvalidVerificationCodeError } from "../../shared/errors.js";
 import { hashSecret, verifySecret } from "../../shared/hash.js";
 import { createRandomCode } from "../../shared/random-code.js";
 import {
@@ -48,10 +50,6 @@ export type EmailServiceDeps = {
   emailCodes: EmailCodeRepository;
   emailTokens: EmailTokenRepository;
 };
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 /**
  * メール認証コードの送信・検証と、アクション用トークンの解決を担う。
@@ -100,30 +98,24 @@ export class EmailService {
 
     // bcrypt はソルト付きのためハッシュ値での検索はできない。
     // email+purpose の有効な認証コードを取り、平文と照合する。
-    const emailCode = await this.deps.emailCodes.findLatestByEmailAndPurpose(
-      email,
-      purpose,
+    const emailCode = ensureVerificationCodeLive(
+      await this.deps.emailCodes.findLatestByEmailAndPurpose(email, purpose),
+      now,
     );
-
-    if (
-      !emailCode ||
-      emailCode.usedAt !== null ||
-      emailCode.expiresAt <= now
-    ) {
-      throw new InvalidVerificationCodeError();
-    }
 
     assertVerificationAttemptAllowed(emailCode.attemptCount);
 
     const matched = await verifySecret(input.code, emailCode.codeHash);
     if (!matched) {
       await this.deps.emailCodes.incrementAttemptCount(emailCode.id);
-      throw new InvalidVerificationCodeError();
+      assertVerificationCodeMatches(matched);
     }
 
     await this.deps.emailCodes.markUsed(emailCode.id, now);
 
-    if (purpose === "unlock") {
+    const outcome = resolveVerifyCodeOutcome(purpose);
+
+    if (outcome.kind === "unlock") {
       const userId =
         emailCode.userId ??
         (await this.deps.users.findByEmail(email))?.id ??
@@ -134,7 +126,7 @@ export class EmailService {
       return { token: null };
     }
 
-    if (!isEmailActionPurpose(purpose)) {
+    if (outcome.kind !== "issue-action-token") {
       return { token: null };
     }
 
@@ -144,11 +136,14 @@ export class EmailService {
       now.getTime() + EMAIL_ACTION_TOKEN_TTL_SECONDS * 1000,
     );
 
-    await this.deps.emailTokens.invalidateActiveForEmail(email, purpose);
+    await this.deps.emailTokens.invalidateActiveForEmail(
+      email,
+      outcome.purpose,
+    );
     const record = await this.deps.emailTokens.create({
       email,
       userId: emailCode.userId,
-      purpose,
+      purpose: outcome.purpose,
       tokenHash,
       expiresAt,
     });

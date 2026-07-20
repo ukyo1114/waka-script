@@ -2,8 +2,10 @@ import {
   ChannelAdminCannotLeaveError,
   ChannelGuestNotAllowedError,
   ChannelNotFoundError,
+  ChannelParticipantNotFoundError,
   ChannelPasswordRequiredError,
   GuestActionNotAllowedError,
+  InvalidChannelPasswordError,
   NotChannelAdminError,
 } from "../../shared/errors.js";
 import type { UserId } from "../user/index.js";
@@ -11,6 +13,7 @@ import {
   DEFAULT_PHASE_DURATIONS,
   GamePhase,
   type Channel,
+  type ChannelParticipant,
   type ChannelSettings,
   type GameSettings,
   type GameSettingsInput,
@@ -53,6 +56,35 @@ export const assertPasswordProvidedIfProtected = (
     throw new ChannelPasswordRequiredError();
   }
 };
+
+/** verifySecret の結果を業務意味に変換する（照合実行はサービス側） */
+export const assertChannelPasswordMatches = (matched: boolean): void => {
+  if (!matched) {
+    throw new InvalidChannelPasswordError();
+  }
+};
+
+export function ensureChannelParticipantExists(
+  participant: ChannelParticipant | null,
+): ChannelParticipant {
+  if (!participant || participant.deletedAt) {
+    throw new ChannelParticipantNotFoundError();
+  }
+  return participant;
+}
+
+/** 指定チャンネルに属し、操作者本人の参加者であることを保証する */
+export function ensureOwnedChannelParticipant(
+  participant: ChannelParticipant | null,
+  channelId: string,
+  userId: UserId,
+): ChannelParticipant {
+  const existing = ensureChannelParticipantExists(participant);
+  if (existing.channelId !== channelId || existing.userId !== userId) {
+    throw new ChannelParticipantNotFoundError();
+  }
+  return existing;
+}
 
 /**
  * passwordEnabled 時は password または既存 hash が必要。

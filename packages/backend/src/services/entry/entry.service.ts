@@ -4,15 +4,13 @@ import {
 } from "../../domain/channel-entry/index.js";
 import {
   ensureChannelExists,
+  ensureOwnedChannelParticipant,
   isCountReachedToStartGame,
 } from "../../domain/channel/index.js";
 import type { ChannelEntryRepository } from "../../repositories/channel-entry/index.js";
 import type { ChannelParticipantRepository } from "../../repositories/channel-participant/index.js";
 import type { ChannelRepository } from "../../repositories/channel/index.js";
-import {
-  ChannelParticipantNotFoundError,
-  NotImplementedError,
-} from "../../shared/errors.js";
+import { NotImplementedError } from "../../shared/errors.js";
 
 export type EntryResult = {
   participantIds: string[];
@@ -73,16 +71,11 @@ export class EntryService {
     participantId: string,
     userId: string,
   ) {
-    const participant =
-      await this.requireDeps().channelParticipants.findActiveById(participantId);
-    if (
-      !participant ||
-      participant.channelId !== channelId ||
-      participant.userId !== userId
-    ) {
-      throw new ChannelParticipantNotFoundError();
-    }
-    return participant;
+    return ensureOwnedChannelParticipant(
+      await this.requireDeps().channelParticipants.findActiveById(participantId),
+      channelId,
+      userId,
+    );
   }
 
   async register(input: RegisterEntryInput): Promise<EntryResult> {
